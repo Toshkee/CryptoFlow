@@ -1,0 +1,133 @@
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 82px;
+
+  background: rgba(15, 15, 15, 0.7);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-light);
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  z-index: 1000;
+}
+
+.nav-content {
+  width: 100%;
+  max-width: 1400px;
+  padding: 0 40px;
+
+  display: flex;
+  align-items: center;
+}
+
+/* LOGO (left) */
+.nav-logo {
+  margin-right: 60px;
+}
+
+.nav-logo a {
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: var(--neon-green);
+  text-decoration: none;
+  text-shadow: 0 0 10px var(--neon-green-glow);
+}
+
+/* CENTER LINKS */
+.nav-links {
+  display: flex;
+  gap: 36px;
+  align-items: center;
+  flex: 1;                /* <-- forces center positioning */
+  justify-content: center;
+}
+
+.nav-links a {
+  position: relative;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: 0.25s ease;
+}
+
+/* underline */
+.nav-links a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  width: 0%;
+  height: 2px;
+  background: var(--neon-green);
+  border-radius: 3px;
+  transition: width 0.25s ease;
+}
+
+.nav-links a:hover::after,
+.nav-links a.active::after {
+  width: 100%;
+}
+
+/* RIGHT BUTTONS */
+.nav-auth-buttons {
+  display: flex;
+  gap: 14px;
+  margin-left: auto;      /* <-- pushes buttons to far right */
+}
+
+/* Sign In */
+.nav-btn {
+  padding: 9px 22px;
+  border-radius: 12px;
+  background: #0e0f11;
+  color: var(--neon-green);
+  font-weight: 700;
+  border: 1px solid rgba(0, 255, 156, 0.35);
+  cursor: pointer;
+  transition: 0.25s ease;
+}
+
+.nav-btn:hover {
+  background: rgba(0, 255, 156, 0.12);
+  color: white;
+  border-color: rgba(0, 255, 156, 0.8);
+  box-shadow: 0 0 12px rgba(0, 255, 156, 0.4);
+}
+
+/* Sign Up */
+.nav-btn-outline {
+  padding: 9px 22px;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--neon-green);
+  font-weight: 700;
+  border: 1px solid rgba(0, 255, 156, 0.35);
+  cursor: pointer;
+  transition: 0.25s ease;
+}
+
+.nav-btn-outline:hover {
+  background: rgba(0, 255, 156, 0.12);
+  color: white;
+  border-color: var(--neon-green);
+  box-shadow: 0 0 14px rgba(0, 255, 156, 0.4);
+}
+
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--neon-green);
+}

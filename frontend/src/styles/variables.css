@@ -1,0 +1,14 @@
+:root {
+  --bg: #0d0d0d;
+  --bg-card: #151515;
+  --bg-glass: rgba(255,255,255,0.03);
+
+  --text-primary: #f1f1f1;
+  --text-secondary: #9aa0a6;
+
+  --neon-green: #00ff94;
+  --neon-green-soft: rgba(0,255,148,0.35);
+  --neon-green-glow: rgba(0,255,148,0.18);
+
+  --border-light: rgba(255,255,255,0.06);
+}

@@ -1,0 +1,13 @@
+:root {
+  --bg-dark: #0d0e12;
+  --bg-light: #131417;
+  --card-dark: #1a1b1f;
+
+  --text-primary: #eaecef;
+  --text-secondary: #a0a4ac;
+
+  --neon-green: #00ff9c;
+  --neon-green-hover: #17ffa7;
+
+  --border-light: rgba(255,255,255,0.08);
+}

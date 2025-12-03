@@ -1,0 +1,78 @@
+/* DARK NEON POPUP */
+.cf-popup {
+  border: 1px solid rgba(0, 255, 149, 0.3) !important;
+  box-shadow: 0 0 30px rgba(0, 255, 149, 0.2) !important;
+  border-radius: 16px !important;
+  padding: 20px !important;
+}
+
+/* TITLE GLOW EFFECT */
+.cf-title {
+  color: #00ff95 !important;
+  text-shadow: 0 0 8px rgba(0, 255, 149, 0.6);
+  font-weight: 700;
+}
+
+/* CONFIRM BUTTON (NEON GREEN) */
+.cf-btn {
+  background: #00ff95 !important;
+  color: #000 !important;
+  border-radius: 8px !important;
+  font-weight: 700 !important;
+  padding: 10px 20px !important;
+  box-shadow: 0 0 10px rgba(0, 255, 149, 0.7) !important;
+}
+
+/* CANCEL BUTTON (NEUTRAL DARK) */
+.cf-cancel-btn {
+  background: #111 !important;
+  color: #aaa !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+}
+
+.cf-cancel-btn:hover {
+  background: #222 !important;
+}
+
+/* Glow for entire popup */
+.neon-popup {
+  box-shadow: 0 0 25px rgba(0, 255, 255, 0.6);
+  border: 1px solid rgba(0, 255, 255, 0.4);
+}
+
+.neon-title {
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.8);
+  color: #00eaff !important;
+  font-weight: 600 !important;
+}
+
+/* Body text */
+.neon-text {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 1rem;
+  margin-top: 10px;
+}
+
+/* Make SweetAlert animations cleaner */
+.swal2-popup {
+  animation: fadeInNeon 0.3s ease-out !important;
+}
+
+.neon-alert {
+  box-shadow: 0 0 25px #00eaff, 0 0 50px #00eaff, 0 0 75px #00eaff;
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  backdrop-filter: blur(8px);
+}
+
+@keyframes fadeInNeon {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+    box-shadow: none;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
