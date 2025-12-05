@@ -30,9 +30,7 @@ export default function MarketsPage() {
     localStorage.setItem("favorites", JSON.stringify(updated));
   };
 
-  // ---------------------------------------------
-  // CATEGORIES (CURATED)
-  // ---------------------------------------------
+
   const categoryRules = {
     L1: [
       "bitcoin", "ethereum", "solana", "avalanche-2", "cardano", "polkadot",
@@ -63,13 +61,10 @@ export default function MarketsPage() {
     return "Other";
   };
 
-  // ---------------------------------------------
-  // LOAD COINS FROM BACKEND
-  // ---------------------------------------------
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await apiGet("/markets/top100/"); // BACKEND ENDPOINT
+        const data = await apiGet("/markets/top100/"); // 
         const withCategories = data.map((c) => ({
           ...c,
           curated_category: detectCategory(c.id),
@@ -86,9 +81,7 @@ export default function MarketsPage() {
     load();
   }, []);
 
-  // ---------------------------------------------
-  // FILTER + SORT
-  // ---------------------------------------------
+
   const filteredCoins = coins
     .filter((coin) => {
       if (showFavOnly && !favorites.includes(coin.id)) return false;
@@ -116,9 +109,7 @@ export default function MarketsPage() {
   const totalPages = Math.ceil(filteredCoins.length / PER_PAGE);
   const paginated = filteredCoins.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
-  // ---------------------------------------------
-  // SPARKLINE ENTRY ANIMATION
-  // ---------------------------------------------
+ 
   useEffect(() => {
     const rows = document.querySelectorAll(".markets-row");
     const observer = new IntersectionObserver(
@@ -133,9 +124,7 @@ export default function MarketsPage() {
     return () => observer.disconnect();
   }, [paginated]);
 
-  // ---------------------------------------------
-  // UI
-  // ---------------------------------------------
+  
   return (
     <div className="markets-page">
       <h1 className="markets-header">Markets</h1>
