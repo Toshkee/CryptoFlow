@@ -51,7 +51,7 @@ INSTALLED_APPS = [
     'trading',
     'accounts.apps.AccountsConfig',
     'markets',
-    'futures',
+    'futures.apps.FuturesConfig',
 ]
 
 MIDDLEWARE = [
