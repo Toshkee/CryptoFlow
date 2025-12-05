@@ -1,0 +1,8 @@
+from django.apps import AppConfig
+
+class FuturesConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'futures'
+
+    def ready(self):
+        import futures.signals
