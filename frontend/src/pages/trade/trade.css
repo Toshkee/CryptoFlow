@@ -89,27 +89,13 @@
   font-weight: 700;
 }
 
-.timeframe-select {
-  background: #0e0e0e !important;
-  border: 1px solid var(--border-light) !important;
-  color: #d1d1d1 !important;
-  padding: 8px 10px !important;
-  border-radius: 8px !important;
-  cursor: pointer;
-}
-
-.timeframe-select option {
-  background: #0e0e0e;
-  color: #d1d1d1;
-}
-
 .chart-container {
   width: 100%;
   height: 420px;
 }
 
 /* ============================================
-   BOTTOM SECTION (orderbook + trade panel)
+   BOTTOM SECTION
 ============================================ */
 .trade-bottom {
   display: flex;
@@ -135,22 +121,12 @@
   opacity: 0.85;
 }
 
-.orderbook-section h4 {
-  margin-top: 12px;
-  margin-bottom: 6px;
-  font-size: 0.95rem;
-  opacity: 0.65;
-}
-
+/* ROW COLORS */
 .row {
   display: flex;
   justify-content: space-between;
   padding: 8px 4px;
   border-bottom: 1px solid rgba(255,255,255,0.05);
-}
-
-.row:last-child {
-  border-bottom: none;
 }
 
 .row.red span:first-child {
@@ -167,7 +143,7 @@
    TRADE PANEL
 ============================================ */
 .trade-panel {
-  width: 280px;
+  width: 300px;
   background: var(--bg-card);
   border: 1px solid var(--border-light);
   border-radius: 16px;
@@ -180,9 +156,7 @@
   opacity: 0.9;
 }
 
-/* ============================================
-   BUY / SELL BUTTONS (STYLE B)
-============================================ */
+/* BUY / SELL */
 .bs-toggle {
   display: flex;
   gap: 10px;
@@ -197,15 +171,13 @@
   font-weight: 700;
   cursor: pointer;
   transition: 0.2s ease;
-
   border: 1px solid rgba(255,255,255,0.1);
 }
 
-/* ALWAYS green buy button */
+/* BUY button */
 .buy-btn {
   background: rgba(0,255,140,0.15);
   color: var(--neon-green);
-  border-color: rgba(0,255,140,0.35);
 }
 
 .buy-btn.active,
@@ -215,11 +187,10 @@
   box-shadow: 0 0 12px rgba(0,255,140,0.3);
 }
 
-/* ALWAYS red sell button */
+/* SELL button */
 .sell-btn {
   background: rgba(255,77,77,0.15);
   color: #ff4d4d;
-  border-color: rgba(255,77,77,0.35);
 }
 
 .sell-btn.active,
@@ -244,17 +215,58 @@
   color: #fff !important;
   padding: 12px;
   border-radius: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .trade-panel input:focus {
   border-color: var(--neon-green) !important;
   box-shadow: 0 0 10px rgba(0,255,148,0.2);
-  outline: none !important;
 }
 
 /* ============================================
-   CONFIRM BUTTON
+   LEVERAGE SLIDER
+============================================ */
+.leverage-slider {
+  width: 100%;
+  margin-bottom: 20px;
+
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 6px;
+
+  background: linear-gradient(
+    90deg,
+    var(--neon-green) 0%,
+    rgba(0,255,148,0.4) 50%,
+    rgba(255,255,255,0.15) 100%
+  );
+  outline: none;
+  transition: opacity 0.2s;
+}
+
+.leverage-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--neon-green);
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(0,255,148,0.7);
+}
+
+.leverage-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--neon-green);
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(0,255,148,0.7);
+}
+
+/* ============================================
+   CONFIRM ORDER BUTTON
 ============================================ */
 .confirm-btn {
   width: 100%;
@@ -276,13 +288,94 @@
 }
 
 /* ============================================
+   WALLET PANEL + OPEN POSITIONS
+============================================ */
+.wallet-panel {
+  width: 280px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 16px;
+  padding: 18px;
+  height: calc(100vh - 150px);
+  overflow-y: auto;
+}
+
+.wallet-panel h2 {
+  margin-bottom: 10px;
+}
+
+.wallet-balance {
+  font-size: 1.1rem;
+  margin-bottom: 25px;
+}
+
+/* Positions title */
+.section-title {
+  margin-top: 14px;
+  margin-bottom: 10px;
+}
+
+/* ============================================
+   POSITION CARD
+============================================ */
+.pos-card {
+  background: #111;
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 14px;
+  border-radius: 12px;
+  margin-bottom: 14px;
+  transition: 0.2s ease;
+}
+
+.pos-card:hover {
+  border-color: var(--neon-green);
+  box-shadow: 0 0 12px rgba(0,255,148,0.15);
+}
+
+.pos-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.05rem;
+  margin-bottom: 8px;
+}
+
+.pos-info div {
+  margin-bottom: 4px;
+  opacity: 0.8;
+  font-size: 0.88rem;
+}
+
+.pos-pnl {
+  margin: 10px 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+/* Close button */
+.close-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255,77,77,0.15);
+  border: 1px solid #ff4d4d;
+  color: #ff4d4d;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.close-btn:hover {
+  background: rgba(255,77,77,0.25);
+  box-shadow: 0 0 12px rgba(255,77,77,0.3);
+}
+
+/* ============================================
    RESPONSIVE
 ============================================ */
 @media (max-width: 1100px) {
   .trade-bottom {
     flex-direction: column;
   }
-
   .trade-panel {
     width: 100%;
   }
@@ -292,13 +385,11 @@
   .trade-page {
     flex-direction: column;
   }
-
   .markets-sidebar {
     width: 100%;
     display: flex;
     overflow-x: auto;
   }
-
   .market-item {
     min-width: 140px;
   }

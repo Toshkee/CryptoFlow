@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { apiPost } from "../../services/api";
+import { apiGet, apiPost } from "../../services/api";
 import { createChart } from "lightweight-charts";
+import Swal from "sweetalert2";
 import "./trade.css";
 
 export default function Trade() {
-  // ----------------------------------
-  // STATE
-  // ----------------------------------
+  // ---------------- STATE ----------------
   const [symbol, setSymbol] = useState("BTCUSDT");
   const [interval, setIntervalValue] = useState("1m");
   const [side, setSide] = useState("BUY");
@@ -14,10 +13,9 @@ export default function Trade() {
   const [leverage, setLeverage] = useState(20);
   const [livePrice, setLivePrice] = useState(null);
 
-  const [orderbook, setOrderbook] = useState({
-    asks: [],
-    bids: [],
-  });
+  const [orderbook, setOrderbook] = useState({ asks: [], bids: [] });
+  const [wallet, setWallet] = useState(null);
+  const [positions, setPositions] = useState([]);
 
   const wsRef = useRef(null);
   const chartRef = useRef(null);
@@ -30,28 +28,42 @@ export default function Trade() {
     "DOTUSDT", "ATOMUSDT", "NEARUSDT", "FILUSDT"
   ];
 
-  // ----------------------------------
-  // CREATE CHART
-  // ----------------------------------
+  // ---------------- WALLET + POSITIONS REFRESH ----------------
+  const loadWallet = async () => {
+    const res = await apiGet("/futures/wallet/");
+    if (!res.error) setWallet(res);
+  };
+
+  const loadPositions = async () => {
+    const res = await apiGet("/futures/positions/");
+    if (Array.isArray(res)) setPositions(res);
+    else setPositions([]);
+  };
+
+  useEffect(() => {
+    loadWallet();
+    loadPositions();
+    const interval = setInterval(() => {
+      loadWallet();
+      loadPositions();
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // ---------------- CHART ----------------
   const createNewChart = () => {
     if (!chartRef.current) return;
-
-    if (chartInstance.current) {
-      chartInstance.current.remove();
-    }
+    if (chartInstance.current) chartInstance.current.remove();
 
     const chart = createChart(chartRef.current, {
       width: chartRef.current.clientWidth,
       height: 420,
-      layout: {
-        background: { color: "#0a0a0a" },
-        textColor: "#d1d1d1"
-      },
+      layout: { background: { color: "#0a0a0a" }, textColor: "#d1d1d1" },
       grid: {
         vertLines: { color: "rgba(255,255,255,0.05)" },
-        horzLines: { color: "rgba(255,255,255,0.05)" }
+        horzLines: { color: "rgba(255,255,255,0.05)" },
       },
-      timeScale: { borderColor: "rgba(255,255,255,0.1)" }
     });
 
     const series = chart.addCandlestickSeries({
@@ -60,46 +72,38 @@ export default function Trade() {
       wickUpColor: "#00ff8c",
       wickDownColor: "#ff4d4d",
       borderUpColor: "#00ff8c",
-      borderDownColor: "#ff4d4d"
+      borderDownColor: "#ff4d4d",
     });
 
     chartInstance.current = chart;
     candleSeries.current = series;
   };
 
-  // ----------------------------------
-  // LOAD HISTORICAL CANDLES
-  // ----------------------------------
   const loadCandles = async (sym, tf) => {
-    const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=${tf}&limit=300`;
-    const raw = await fetch(url).then((r) => r.json());
+    const raw = await fetch(
+      `https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=${tf}&limit=300`
+    ).then((r) => r.json());
 
-    const formatted = raw.map((c) => ({
-      time: c[0] / 1000,
-      open: +c[1],
-      high: +c[2],
-      low: +c[3],
-      close: +c[4],
-    }));
-
-    candleSeries.current.setData(formatted);
+    candleSeries.current.setData(
+      raw.map((c) => ({
+        time: c[0] / 1000,
+        open: +c[1],
+        high: +c[2],
+        low: +c[3],
+        close: +c[4],
+      }))
+    );
   };
 
-  // ----------------------------------
-  // START WEBSOCKET
-  // ----------------------------------
+  // ---------------- WEBSOCKET ----------------
   const startLiveFeeds = (sym) => {
     const lower = sym.toLowerCase();
-    const wsUrl =
-      `wss://fstream.binance.com/stream?streams=` +
-      `${lower}@markPrice/${lower}@depth20@100ms`;
+    const url = `wss://fstream.binance.com/stream?streams=${lower}@markPrice/${lower}@depth20@100ms`;
 
     if (wsRef.current) wsRef.current.close();
 
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket(url);
     wsRef.current = ws;
-
-    ws.onopen = () => console.log("WS Connected:", wsUrl);
 
     ws.onmessage = (msg) => {
       let packet;
@@ -109,98 +113,129 @@ export default function Trade() {
         return;
       }
 
-      if (!packet || !packet.stream) return;
-
       const { stream, data } = packet;
 
-      // ----- mark price -----
-      if (stream.includes("markPrice") && data?.markPrice) {
-        setLivePrice(parseFloat(data.markPrice));
+      if (stream.includes("markPrice") && data?.p) {
+        setLivePrice(parseFloat(data.p));
       }
 
-      // ----- depth update -----
       if (stream.includes("depth20") && data?.a && data?.b) {
-        // a = asks | b = bids
         setOrderbook({
-          asks: data.a.slice(0, 10).map(([p, q]) => ({
-            price: parseFloat(p),
-            qty: parseFloat(q)
-          })),
-          bids: data.b.slice(0, 10).map(([p, q]) => ({
-            price: parseFloat(p),
-            qty: parseFloat(q)
-          }))
+          asks: data.a.slice(0, 10).map(([p, q]) => ({ price: +p, qty: +q })),
+          bids: data.b.slice(0, 10).map(([p, q]) => ({ price: +p, qty: +q })),
         });
       }
     };
-
-    ws.onerror = () => console.warn("WS Error");
-    ws.onclose = () => console.warn("WS Closed");
   };
 
-  // ----------------------------------
-  // RELOAD WHEN SYMBOL OR TF CHANGES
-  // ----------------------------------
   useEffect(() => {
     createNewChart();
     loadCandles(symbol, interval);
     startLiveFeeds(symbol);
 
-    return () => {
-      if (wsRef.current) wsRef.current.close();
-    };
+    return () => wsRef.current?.close();
   }, [symbol, interval]);
 
-  // ----------------------------------
-  // SEND ORDER
-  // ----------------------------------
+  // ---------------- OPEN ORDER ----------------
   const submitOrder = async () => {
-    try {
-      const res = await apiPost("/futures/open/", {
-        symbol,
-        side,
-        leverage,
-        margin,
-        price: livePrice
+    if (!livePrice)
+      return Swal.fire("Wait", "Live price not available yet.", "warning");
+
+    const res = await apiPost("/futures/open/", {
+      symbol,
+      side,
+      leverage,
+      margin,
+      price: livePrice,
+    });
+
+    if (res.error) {
+      Swal.fire({
+        icon: "error",
+        title: "Order Failed",
+        text: res.error,
+        background: "#1a1a1a",
+        color: "#fff",
       });
-      alert("Order Submitted:\n" + JSON.stringify(res, null, 2));
-    } catch {
-      alert("Order Failed");
+    } else {
+      Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Order opened!",
+        background: "#1a1a1a",
+        color: "#fff",
+      });
+
+      loadWallet();
+      loadPositions();
     }
   };
 
-  // ----------------------------------
-  // UI
-  // ----------------------------------
+  // ---------------- CLOSE POSITION ----------------
+  const closePosition = async (id) => {
+    if (!livePrice)
+      return Swal.fire("Wait", "Live price not ready.", "warning");
+
+    const res = await apiPost(`/futures/close/${id}/`, { price: livePrice });
+
+    if (res.error) {
+      Swal.fire({
+        icon: "error",
+        title: "Close Failed",
+        text: res.error,
+        background: "#1a1a1a",
+        color: "#fff",
+      });
+    } else {
+      Swal.fire({
+        icon: "success",
+        title: "Closed",
+        html: `Realized PnL: <b>${parseFloat(res.pnl).toFixed(2)} USDT</b>`,
+        background: "#1a1a1a",
+        color: "#fff",
+      });
+
+      loadWallet();
+      loadPositions();
+    }
+  };
+
+  // ---------------- CALCULATE LIVE PNL ----------------
+  const calcPnL = (pos) => {
+    if (!livePrice) return 0;
+
+    const entry = parseFloat(pos.entry_price);
+    const contracts = parseFloat(pos.amount);
+
+    return pos.side === "LONG"
+      ? (livePrice - entry) * contracts
+      : (entry - livePrice) * contracts;
+  };
+
+  // ---------------- RENDER ----------------
   return (
     <div className="trade-page">
-      
-      {/* SIDEBAR */}
+
+      {/* LEFT SIDEBAR */}
       <aside className="markets-sidebar">
         <h2>Markets</h2>
         {MARKETS.map((m) => (
           <div
             key={m}
-            onClick={() => setSymbol(m)}
             className={`market-item ${symbol === m ? "active" : ""}`}
+            onClick={() => setSymbol(m)}
           >
             {m}
           </div>
         ))}
       </aside>
 
-      {/* CENTER */}
+      {/* CENTER SECTION */}
       <div className="trade-center">
-
-        {/* CHART */}
         <div className="chart-box">
           <div className="chart-top">
             <h3>{symbol} Perpetual</h3>
-            <select
-              className="timeframe-select"
-              value={interval}
-              onChange={(e) => setIntervalValue(e.target.value)}
-            >
+            <select value={interval} onChange={(e) => setIntervalValue(e.target.value)}>
               <option value="1m">1m</option>
               <option value="5m">5m</option>
               <option value="15m">15m</option>
@@ -213,38 +248,33 @@ export default function Trade() {
           <div ref={chartRef} className="chart-container"></div>
         </div>
 
-        {/* BOTTOM SECTION */}
         <div className="trade-bottom">
-
-          {/* ORDER BOOK */}
+          {/* ORDERBOOK */}
           <div className="orderbook-box">
             <h3>Order Book</h3>
 
             <h4>Asks</h4>
-            {orderbook.asks.length === 0
-              ? <p>Loading...</p>
-              : orderbook.asks.map((row, i) => (
-                  <div key={i} className="row red">
-                    <span>{row.price.toFixed(2)}</span>
-                    <span>{row.qty}</span>
-                  </div>
-                ))}
+            {orderbook.asks.map((a, i) => (
+              <div key={i} className="row red">
+                <span>{a.price.toFixed(2)}</span>
+                <span>{a.qty}</span>
+              </div>
+            ))}
 
             <h4>Bids</h4>
-            {orderbook.bids.length === 0
-              ? <p>Loading...</p>
-              : orderbook.bids.map((row, i) => (
-                  <div key={i} className="row green">
-                    <span>{row.price.toFixed(2)}</span>
-                    <span>{row.qty}</span>
-                  </div>
-                ))}
+            {orderbook.bids.map((b, i) => (
+              <div key={i} className="row green">
+                <span>{b.price.toFixed(2)}</span>
+                <span>{b.qty}</span>
+              </div>
+            ))}
           </div>
 
           {/* TRADE PANEL */}
           <div className="trade-panel">
             <h3>Trade</h3>
 
+            {/* BUY SELL */}
             <div className="bs-toggle">
               <button
                 className={side === "BUY" ? "buy-btn active" : "buy-btn"}
@@ -264,19 +294,17 @@ export default function Trade() {
             <input readOnly value={livePrice?.toFixed(2) || "..."} />
 
             <label>Margin (USDT)</label>
-            <input
-              type="number"
-              value={margin}
-              onChange={(e) => setMargin(e.target.value)}
-            />
+            <input type="number" value={margin} onChange={(e) => setMargin(e.target.value)} />
 
-            <label>Leverage</label>
+            {/* LEVERAGE SLIDER */}
+            <label>Leverage: {leverage}×</label>
             <input
-              type="number"
+              type="range"
               min="1"
               max="125"
               value={leverage}
               onChange={(e) => setLeverage(e.target.value)}
+              className="leverage-slider"
             />
 
             <button className="confirm-btn" onClick={submitOrder}>
@@ -285,6 +313,51 @@ export default function Trade() {
           </div>
         </div>
       </div>
+
+      {/* RIGHT SIDEBAR — POSITIONS & WALLET */}
+      <aside className="wallet-panel">
+        <h2>Wallet</h2>
+        <div className="wallet-balance">
+          Balance:{" "}
+          <strong>{wallet ? Number(wallet.balance).toFixed(2) : "..."}</strong>
+        </div>
+
+        <h2 className="section-title">Open Positions</h2>
+
+        {positions.length === 0 && <p className="no-pos">No open positions</p>}
+
+        {positions.map((pos) => {
+          const pnl = calcPnL(pos);
+
+          return (
+            <div key={pos.id} className="pos-card">
+              <div className="pos-header">
+                <strong>{pos.symbol}</strong>
+                <span className={pos.side === "LONG" ? "green" : "red"}>{pos.side}</span>
+              </div>
+
+              <div className="pos-info">
+                <div>Entry: {parseFloat(pos.entry_price).toFixed(2)}</div>
+                <div>Contracts: {parseFloat(pos.amount).toFixed(4)}</div>
+                <div>Liq: {parseFloat(pos.liquidation_price).toFixed(2)}</div>
+              </div>
+
+              <div
+                className="pos-pnl"
+                style={{
+                  color: pnl >= 0 ? "#00ff8c" : "#ff4d4d",
+                }}
+              >
+                PnL: {pnl.toFixed(2)}
+              </div>
+
+              <button className="close-btn" onClick={() => closePosition(pos.id)}>
+                Close Position
+              </button>
+            </div>
+          );
+        })}
+      </aside>
     </div>
   );
 }
