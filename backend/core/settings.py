@@ -12,6 +12,10 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -47,6 +51,7 @@ INSTALLED_APPS = [
     'trading',
     'accounts.apps.AccountsConfig',
     'markets',
+    'futures',
 ]
 
 MIDDLEWARE = [
@@ -158,11 +163,3 @@ SIMPLE_JWT = {
 
 MIDDLEWARE.insert(1, 'corsheaders.middleware.CorsMiddleware')
 
-import cloudinary
-import cloudinary.uploader
-
-cloudinary.config( 
-  cloud_name = "duh7yilbw",
-  api_key = "127459359239594",
-  api_secret = "ptKoULUDNPmulGmTjDR2Q6cldLY",
-)
