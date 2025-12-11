@@ -1,3 +1,7 @@
+/* ---------------------------------------------------
+   MARKETS PAGE LAYOUT
+--------------------------------------------------- */
+
 .markets-page {
   padding-top: 140px;
   padding-bottom: 120px;
@@ -8,7 +12,12 @@
     radial-gradient(circle at 50% 20%, rgba(0,255,148,0.045), transparent 60%),
     radial-gradient(circle at 80% 80%, rgba(0,255,148,0.03), transparent 65%),
     var(--bg);
+  color: white; /* ← ensures visibility */
 }
+
+/* ---------------------------------------------------
+   HEADER
+--------------------------------------------------- */
 
 .markets-header {
   font-size: 2.7rem;
@@ -17,6 +26,9 @@
   margin-bottom: 25px;
 }
 
+/* ---------------------------------------------------
+   CATEGORY TABS
+--------------------------------------------------- */
 
 .markets-tabs {
   display: flex;
@@ -60,6 +72,9 @@
   box-shadow: 0 0 15px var(--neon-green);
 }
 
+/* ---------------------------------------------------
+   SEARCH + SORT BAR
+--------------------------------------------------- */
 
 .markets-controls {
   display: flex;
@@ -95,6 +110,10 @@
   cursor: pointer;
 }
 
+/* ---------------------------------------------------
+   MAIN TABLE
+--------------------------------------------------- */
+
 .markets-table {
   width: 100%;
   background: var(--bg-card);
@@ -104,6 +123,9 @@
   box-shadow: 0 0 20px rgba(0,255,148,0.05);
 }
 
+/* ---------------------------------------------------
+   ROWS
+--------------------------------------------------- */
 
 .markets-row {
   display: grid;
@@ -113,8 +135,8 @@
   border-bottom: 1px solid rgba(255,255,255,0.06);
   font-size: 1.05rem;
 
-  opacity: 0;
-  transform: translateY(12px);
+  opacity: 1;              /* ← FIX: visible */
+  transform: none;         /* ← FIX: static, no hidden offset */
   transition: 0.35s ease-out;
 }
 
@@ -125,8 +147,6 @@
 .markets-row.header {
   font-weight: 700;
   color: var(--text-secondary);
-  opacity: 1 !important;
-  transform: none !important;
 }
 
 .markets-row:hover {
@@ -135,11 +155,9 @@
   transform: translateY(-2px);
 }
 
-.show-row {
-  opacity: 1 !important;
-  transform: translateY(0) !important;
-}
-
+/* ---------------------------------------------------
+   ASSET INFO
+--------------------------------------------------- */
 
 .market-asset {
   display: flex;
@@ -175,6 +193,9 @@
   width: fit-content;
 }
 
+/* ---------------------------------------------------
+   SPARKLINE
+--------------------------------------------------- */
 
 svg {
   overflow: visible;
@@ -184,6 +205,9 @@ polyline {
   filter: drop-shadow(0 0 6px rgba(0,255,156,0.18));
 }
 
+/* ---------------------------------------------------
+   COLORS
+--------------------------------------------------- */
 
 .green {
   color: var(--neon-green);
@@ -194,6 +218,10 @@ polyline {
   color: #ff4d4d;
   font-weight: 700;
 }
+
+/* ---------------------------------------------------
+   FAVORITES
+--------------------------------------------------- */
 
 .fav-star {
   font-size: 1.35rem;
@@ -215,6 +243,9 @@ polyline {
     0 0 22px rgba(255, 215, 0, 1);
 }
 
+/* ---------------------------------------------------
+   PAGINATION
+--------------------------------------------------- */
 
 .pagination-controls {
   margin-top: 30px;
@@ -252,6 +283,9 @@ polyline {
   background: rgba(255,255,255,0.04);
 }
 
+/* ---------------------------------------------------
+   SKELETON LOADER
+--------------------------------------------------- */
 
 .skeleton {
   background: rgba(255, 255, 255, 0.07);

@@ -1,86 +1,71 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import { apiGet } from "/src/services/api";
 import "./homepage.css";
 
 export default function HomePage() {
   const [coins, setCoins] = useState([]);
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const res = await axios.get(
-          "https://api.coingecko.com/api/v3/coins/markets",
-          {
-            params: {
-              vs_currency: "usd",
-              ids:
-                "bitcoin,ethereum,solana,ripple,cardano,binancecoin,polkadot,matic-network",
-              order: "market_cap_desc",
-              per_page: 8,
-              sparkline: false,
-            },
-          }
-        );
+    async function load() {
+      const data = await apiGet("/markets/top8/");
+      console.log("TOP8:", data);
 
-        if (Array.isArray(res.data)) {
-          setCoins(res.data);
-        }
-      } catch (error) {
-        console.error("CoinGecko error:", error);
+      if (Array.isArray(data)) {
+        // Filter out EMPTY or broken coin objects
+        setCoins(
+          data
+            .filter((c) => c && c.id && c.current_price != null)
+            .map((c) => ({
+              ...c,
+              symbol: c.symbol ? c.symbol.toUpperCase() : "--",
+              price: c.current_price ? c.current_price : 0,
+              change: c.price_change_percentage_24h
+                ? c.price_change_percentage_24h
+                : 0,
+            }))
+        );
       }
     }
 
-    fetchData();
-    const interval = setInterval(fetchData, 30000);
+    load();
+    const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
-
   }, []);
 
   return (
     <div className="home-container">
       <div className="home-content">
 
-        {/* HERO */}
+        {/* HERO SECTION */}
         <section className="hero">
           <div className="hero-text">
             <h1 className="hero-title">Trade Crypto Anytime</h1>
-
             <p className="hero-subtitle">
-              Buy and trade digital assets securely with a modern trading platform.
+              Buy and trade digital assets securely on a modern platform.
             </p>
           </div>
         </section>
 
-        {/* MARKETS */}
+        {/* TOP MARKETS */}
         <section className="markets">
           <h2 className="markets-title">Top Markets</h2>
 
           <div className="market-grid">
+            {coins.length === 0 ? (
+              <p style={{ color: "gray" }}>Loading...</p>
+            ) : (
+              coins.map((coin) => (
+                <div className="market-card" key={coin.id}>
+                  <span>{coin.symbol || "--"}</span>
 
-          {coins.length === 0 ? (
-  <p style={{ color: "gray" }}>Loading live prices...</p>
-) : (
-  coins.map((coin) => (
-    <div className="market-card" key={coin.id}>
-      <span>{coin.symbol?.toUpperCase()}</span>
+                  <strong>${Number(coin.price).toLocaleString()}</strong>
 
-      <strong>
-        ${coin.current_price ? coin.current_price.toLocaleString() : "—"}
-      </strong>
-
-      <p
-        className={
-          coin.price_change_percentage_24h >= 0 ? "green" : "red"
-        }
-      >
-        {coin.price_change_percentage_24h
-          ? coin.price_change_percentage_24h.toFixed(2) + "%"
-          : "—"}
-      </p>
-    </div>
-  ))
-)}
-
+                  <p className={coin.change >= 0 ? "green" : "red"}>
+                    {coin.change.toFixed(2)}%
+                  </p>
+                </div>
+              ))
+            )}
           </div>
         </section>
 

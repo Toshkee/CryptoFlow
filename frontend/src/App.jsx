@@ -24,7 +24,10 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/markets" element={<Markets />} />
-        <Route path="/coin/:coin_id" element={<CoinDetail />} />
+        <Route
+          path="/coin/:coin_id"
+          element={<CoinDetail key={window.location.pathname} />}
+        />
         <Route path="/trade" element={<Trade />} />
         <Route path="/wallet" element={<Wallet />} />
         <Route path="/profile" element={<Profile />} />
@@ -36,3 +39,4 @@ export default function App() {
     </>
   );
 }
+
