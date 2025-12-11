@@ -1,1 +1,1 @@
-web: gunicorn crypto-flow.wsgi
+web: gunicorn core.wsgi:application --chdir backend --log-file -
