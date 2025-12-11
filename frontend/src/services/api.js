@@ -4,7 +4,7 @@ import Swal from "sweetalert2";
 // Base API URL
 // - In prod, use VITE_API_BASE (set in Netlify)
 // - Locally, fall back to Django dev server
-const API_URL =
+export const API_URL =
   import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000/api";
 
 // -------------------------
