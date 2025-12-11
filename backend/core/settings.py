@@ -17,7 +17,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # -------------------------------------------------------------------
 # DEBUG / SECRET KEY
 # -------------------------------------------------------------------
-# Use env vars in production, fall back to dev defaults locally
 DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 
 SECRET_KEY = os.getenv(
@@ -28,34 +27,39 @@ SECRET_KEY = os.getenv(
 # -------------------------------------------------------------------
 # HOSTS / CORS / CSRF
 # -------------------------------------------------------------------
-HEROKU_APP_NAME = os.getenv("HEROKU_APP_NAME")  # we'll set this on Heroku
+HEROKU_APP_NAME = os.getenv("HEROKU_APP_NAME")  # e.g. "crypto-flow-8b8fe5dcb0bc"
+DEPLOYED_FRONTEND_URL = os.getenv("DEPLOYED_FRONTEND_URL")
+DEPLOYED_BACKEND_URL = os.getenv("DEPLOYED_BACKEND_URL")
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
-
-# Allow your Heroku app host
-if HEROKU_APP_NAME:
-    ALLOWED_HOSTS.append(f"{HEROKU_APP_NAME}.herokuapp.com")
-
-# As a simple safety net, allow everything in production if nothing set
-if not DEBUG and not HEROKU_APP_NAME:
-    ALLOWED_HOSTS.append("*")
-
-# CORS / CSRF
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # local frontend
+# Allowed hosts
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "crypto-flow-8b8fe5dcb0bc.herokuapp.com",  # your Heroku app
 ]
 
-DEPLOYED_FRONTEND_URL = os.getenv("DEPLOYED_FRONTEND_URL")
-if DEPLOYED_FRONTEND_URL:
+if HEROKU_APP_NAME:
+    host = f"{HEROKU_APP_NAME}.herokuapp.com"
+    if host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(host)
+
+# CORS
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",                    # local frontend
+    "https://cryptofloww.netlify.app",          # deployed frontend
+]
+
+if DEPLOYED_FRONTEND_URL and DEPLOYED_FRONTEND_URL not in CORS_ALLOWED_ORIGINS:
     CORS_ALLOWED_ORIGINS.append(DEPLOYED_FRONTEND_URL)
 
+# CSRF trusted origins (must include scheme)
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8000",
     "http://localhost:8000",
+    "https://crypto-flow-8b8fe5dcb0bc.herokuapp.com",
 ]
 
-DEPLOYED_BACKEND_URL = os.getenv("DEPLOYED_BACKEND_URL")
-if DEPLOYED_BACKEND_URL:
+if DEPLOYED_BACKEND_URL and DEPLOYED_BACKEND_URL not in CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS.append(DEPLOYED_BACKEND_URL)
 
 CORS_ALLOW_CREDENTIALS = True
@@ -120,7 +124,6 @@ WSGI_APPLICATION = "core.wsgi.application"
 
 # -------------------------------------------------------------------
 # DATABASE
-# (sqlite is fine for this project, even on Heroku)
 # -------------------------------------------------------------------
 DATABASES = {
     "default": {
@@ -130,7 +133,7 @@ DATABASES = {
 }
 
 # -------------------------------------------------------------------
-# CACHE (for CoinGecko etc.)
+# CACHE
 # -------------------------------------------------------------------
 CACHES = {
     "default": {

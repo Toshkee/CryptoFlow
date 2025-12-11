@@ -1,6 +1,11 @@
+// frontend/src/services/api.js
 import Swal from "sweetalert2";
 
-export const API_URL = "http://127.0.0.1:8000/api";
+// Base API URL
+// - In prod, use VITE_API_BASE (set in Netlify)
+// - Locally, fall back to Django dev server
+const API_URL =
+  import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000/api";
 
 // -------------------------
 // GET TOKENS
@@ -50,7 +55,9 @@ async function request(method, endpoint, body = null, isFile = false) {
   if (!isFile) headers["Content-Type"] = "application/json";
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const url = `${API_URL}${endpoint}`;
+  // make sure endpoint always has a leading slash
+  const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const url = `${API_URL}${path}`;
 
   let res = await fetch(url, {
     method,
