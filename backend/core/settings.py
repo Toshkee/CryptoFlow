@@ -42,16 +42,18 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
-    'users',
+
+    'accounts',
+    'markets',
     'wallet',
     'trading',
-    'accounts.apps.AccountsConfig',
-    'markets',
-    'futures.apps.FuturesConfig',
+    'users.apps.UsersConfig',
+    'futures',
 ]
 
 MIDDLEWARE = [
@@ -96,6 +98,13 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "unique-snowflake",
     }
 }
 

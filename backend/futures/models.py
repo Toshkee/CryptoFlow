@@ -1,14 +1,26 @@
+# futures/models.py
+
 from django.db import models
 from django.contrib.auth.models import User
 from decimal import Decimal
 
 
 class FuturesWallet(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    balance = models.DecimalField(max_digits=20, decimal_places=8, default=0)
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="futures_wallet"
+    )
+
+    # Every new user starts with $10,000
+    balance = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        default=Decimal("10000.00")
+    )
 
     def __str__(self):
-        return f"{self.user.username} Futures Wallet"
+        return f"{self.user.username} Futures Wallet (${self.balance})"
 
 
 class FuturesPosition(models.Model):
@@ -29,11 +41,11 @@ class FuturesPosition(models.Model):
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    symbol = models.CharField(max_length=20)  # "btc-usdt"
+    symbol = models.CharField(max_length=20)
     side = models.CharField(max_length=5, choices=SIDE_CHOICES)
 
     entry_price = models.DecimalField(max_digits=20, decimal_places=8)
-    amount = models.DecimalField(max_digits=20, decimal_places=8)        # contracts
+    amount = models.DecimalField(max_digits=20, decimal_places=8)
     leverage = models.IntegerField(default=10)
 
     initial_margin = models.DecimalField(max_digits=20, decimal_places=8)
