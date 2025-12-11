@@ -1,4 +1,4 @@
-/* Layout Container */
+/* Layout */
 .coinpage-container {
   width: 90%;
   max-width: 1200px;
@@ -8,16 +8,52 @@
   margin-top: 120px;
 }
 
-/* Loading State */
+/* Loading */
 .coin-loading-page {
   padding: 4rem;
   text-align: center;
   color: white;
 }
 
-/* -------------------------
-   HEADER (Coinbase Style)
---------------------------- */
+/* Shimmer loaders */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #1c1c1c 0%,
+    #2b2b2b 50%,
+    #1c1c1c 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 16px;
+}
+
+.header-skeleton {
+  height: 140px;
+  margin-bottom: 24px;
+}
+
+.chart-skeleton {
+  height: 280px;
+  margin-bottom: 24px;
+}
+
+.stats-skeleton {
+  height: 160px;
+  margin-bottom: 24px;
+}
+
+.desc-skeleton {
+  height: 260px;
+  margin-bottom: 24px;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Header */
 .coinpage-header {
   display: flex;
   align-items: center;
@@ -26,7 +62,7 @@
   padding: 1.6rem;
   background: #11151a;
   border-radius: 14px;
-  box-shadow: 0 0 25px rgba(0, 255, 153, 0.05);
+  box-shadow: 0 0 25px rgba(0,255,153,0.05);
 }
 
 .coinpage-icon {
@@ -57,24 +93,23 @@
   font-weight: 600;
 }
 
-/* -------------------------
-   CHART CARD
---------------------------- */
+.green { color: #00ff99; }
+.red { color: #ff4d4d; }
+
+/* Chart */
 .coinpage-chart-card {
   margin-top: 1rem;
   padding: 1.8rem;
   background: #11151a;
   border-radius: 14px;
-  box-shadow: 0 0 20px rgba(0, 255, 153, 0.05);
+  box-shadow: 0 0 20px rgba(0,255,153,0.05);
 }
 
 .coinpage-chart-card h2 {
   margin-bottom: 1rem;
 }
 
-/* -------------------------
-   STATS GRID (Coinbase Style)
---------------------------- */
+/* Stats */
 .coinpage-stats-grid {
   margin-top: 2rem;
   display: grid;
@@ -86,7 +121,7 @@
   padding: 1.4rem;
   background: #11151a;
   border-radius: 14px;
-  box-shadow: 0 0 20px rgba(0, 255, 153, 0.05);
+  box-shadow: 0 0 20px rgba(0,255,153,0.05);
 }
 
 .stat-card h4 {
@@ -99,26 +134,75 @@
   font-weight: 600;
 }
 
-/* -------------------------
-   DESCRIPTION
---------------------------- */
+/* Description */
 .coinpage-description {
   margin-top: 2.5rem;
   padding: 1.8rem;
   background: #11151a;
   border-radius: 14px;
-  box-shadow: 0 0 20px rgba(0, 255, 153, 0.05);
+  box-shadow: 0 0 20px rgba(0,255,153,0.05);
   line-height: 1.6;
 }
 
-.coinpage-description h2 {
-  margin-bottom: 1rem;
+.buy-btn {
+  margin-top: 14px;
+  padding: 10px 24px;
+  border-radius: 12px;
+  background: var(--neon-green);
+  color: black;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: 0.25s ease;
 }
 
-.green {
-  color: #00ff99;
+.buy-btn:hover {
+  box-shadow: 0 0 14px var(--neon-green-glow);
 }
 
-.red {
-  color: #ff4d4d;
+/* MODAL */
+.modal-bg {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(4px);
+}
+
+.modal {
+  background: #111;
+  padding: 35px;
+  width: 360px;
+  border-radius: 16px;
+  border: 1px solid var(--neon-green-soft);
+  text-align: center;
+}
+
+.modal-confirm {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--neon-green);
+  font-weight: 700;
+  color: black;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+
+.modal-cancel {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  background: #333;
+  color: white;
+  cursor: pointer;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .coinpage-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }

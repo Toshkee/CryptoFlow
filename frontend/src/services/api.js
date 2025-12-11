@@ -1,7 +1,10 @@
 import Swal from "sweetalert2";
 
-export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+export const API_URL = "http://127.0.0.1:8000/api";
 
+// -------------------------
+// GET TOKENS
+// -------------------------
 function getAccess() {
   return localStorage.getItem("access");
 }
@@ -10,6 +13,9 @@ function getRefresh() {
   return localStorage.getItem("refresh");
 }
 
+// -------------------------
+// REFRESH TOKEN
+// -------------------------
 async function refreshToken() {
   const refresh = getRefresh();
   if (!refresh) return null;
@@ -17,9 +23,7 @@ async function refreshToken() {
   try {
     const res = await fetch(`${API_URL}/accounts/token/refresh/`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh }),
     });
 
@@ -29,63 +33,66 @@ async function refreshToken() {
       localStorage.setItem("access", data.access);
       return data.access;
     }
-
-    return null;
-  } catch {
-    return null;
+  } catch (e) {
+    console.log("Refresh token failed:", e);
   }
+
+  return null;
 }
 
-async function request(method, endpoint, body, isFile = false) {
+// -------------------------
+// MAIN REQUEST WRAPPER
+// -------------------------
+async function request(method, endpoint, body = null, isFile = false) {
   let token = getAccess();
 
-  let headers = {};
+  const headers = {};
   if (!isFile) headers["Content-Type"] = "application/json";
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  let res = await fetch(`${API_URL}${endpoint}`, {
+  const url = `${API_URL}${endpoint}`;
+
+  let res = await fetch(url, {
     method,
     headers,
-    body: isFile ? body : JSON.stringify(body),
+    body: isFile ? body : body ? JSON.stringify(body) : null,
   });
 
-  // If TOKEN EXPIRED → Try refresh
+  // -------------------------
+  // HANDLE TOKEN EXPIRE
+  // -------------------------
   if (res.status === 401) {
     const newToken = await refreshToken();
 
     if (!newToken) {
-      localStorage.clear();
       Swal.fire({ icon: "error", title: "Session expired" });
+      localStorage.clear();
       window.location.href = "/signin";
       return { error: "Session expired" };
     }
 
-    // Retry request with NEW token
-    res = await fetch(`${API_URL}${endpoint}`, {
+    res = await fetch(url, {
       method,
       headers: {
-        ...(token && { Authorization: `Bearer ${newToken}` }),
+        Authorization: `Bearer ${newToken}`,
         ...(isFile ? {} : { "Content-Type": "application/json" }),
       },
-      body: isFile ? body : JSON.stringify(body),
+      body: isFile ? body : body ? JSON.stringify(body) : null,
     });
   }
 
+  // -------------------------
+  // SAFE JSON PARSE
+  // -------------------------
   try {
-    return await res.json();
+    const json = await res.json();
+    return json || { error: "Empty response" };
   } catch {
-    return { error: "Invalid server response" };
+    return { error: "Invalid JSON response" };
   }
 }
 
-export function apiGet(endpoint) {
-  return request("GET", endpoint);
-}
-
-export function apiPost(endpoint, body = {}) {
-  return request("POST", endpoint, body);
-}
-
-export function apiUpload(endpoint, formData) {
-  return request("POST", endpoint, formData, true);
-}
+export const apiGet = (endpoint) => request("GET", endpoint);
+export const apiPost = (endpoint, body = {}) => request("POST", endpoint, body);
+export const apiUpload = (endpoint, formData) =>
+  request("POST", endpoint, formData, true);

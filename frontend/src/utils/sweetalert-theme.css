@@ -1,78 +1,75 @@
-/* DARK NEON POPUP */
-.cf-popup {
-  border: 1px solid rgba(0, 255, 149, 0.3) !important;
-  box-shadow: 0 0 30px rgba(0, 255, 149, 0.2) !important;
-  border-radius: 16px !important;
-  padding: 20px !important;
-}
+/* ============================================
+   SWEETALERT2 — NEON DARK THEME
+============================================ */
 
-/* TITLE GLOW EFFECT */
-.cf-title {
-  color: #00ff95 !important;
-  text-shadow: 0 0 8px rgba(0, 255, 149, 0.6);
-  font-weight: 700;
-}
-
-/* CONFIRM BUTTON (NEON GREEN) */
-.cf-btn {
-  background: #00ff95 !important;
-  color: #000 !important;
-  border-radius: 8px !important;
-  font-weight: 700 !important;
-  padding: 10px 20px !important;
-  box-shadow: 0 0 10px rgba(0, 255, 149, 0.7) !important;
-}
-
-/* CANCEL BUTTON (NEUTRAL DARK) */
-.cf-cancel-btn {
-  background: #111 !important;
-  color: #aaa !important;
-  border-radius: 8px !important;
-  border: 1px solid rgba(255,255,255,0.1) !important;
-}
-
-.cf-cancel-btn:hover {
-  background: #222 !important;
-}
-
-/* Glow for entire popup */
-.neon-popup {
-  box-shadow: 0 0 25px rgba(0, 255, 255, 0.6);
-  border: 1px solid rgba(0, 255, 255, 0.4);
-}
-
-.neon-title {
-  text-shadow: 0 0 8px rgba(0, 255, 255, 0.8);
-  color: #00eaff !important;
-  font-weight: 600 !important;
-}
-
-/* Body text */
-.neon-text {
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 1rem;
-  margin-top: 10px;
-}
-
-/* Make SweetAlert animations cleaner */
 .swal2-popup {
-  animation: fadeInNeon 0.3s ease-out !important;
+  background: #0d0d0d !important;
+  border: 1px solid rgba(0,255,148,0.2) !important;
+  border-radius: 18px !important;
+  color: #fff !important;
+  padding: 30px !important;
+  box-shadow: 0 0 25px rgba(0,255,148,0.15) !important;
 }
 
-.neon-alert {
-  box-shadow: 0 0 25px #00eaff, 0 0 50px #00eaff, 0 0 75px #00eaff;
-  border: 1px solid rgba(0, 255, 255, 0.3);
-  backdrop-filter: blur(8px);
+.swal2-title {
+  color: var(--neon-green) !important;
+  font-size: 1.7rem !important;
+  font-weight: 700 !important;
 }
 
-@keyframes fadeInNeon {
-  0% {
-    transform: scale(0.9);
-    opacity: 0;
-    box-shadow: none;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
+.swal2-html-container {
+  color: #d1d1d1 !important;
+  font-size: 1.1rem !important;
+  margin-top: 10px !important;
+}
+
+.swal2-confirm {
+  background: rgba(0,255,148,0.15) !important;
+  border: 1px solid var(--neon-green) !important;
+  color: var(--neon-green) !important;
+  padding: 10px 20px !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+  transition: 0.2s ease !important;
+}
+
+.swal2-confirm:hover {
+  background: rgba(0,255,148,0.3) !important;
+  box-shadow: 0 0 12px rgba(0,255,148,0.3) !important;
+  color: white !important;
+}
+
+/* ERROR BUTTON (red) */
+.swal2-error .swal2-confirm {
+  background: rgba(255,77,77,0.15) !important;
+  color: #ff4d4d !important;
+  border-color: #ff4d4d !important;
+}
+
+.swal2-error .swal2-confirm:hover {
+  background: rgba(255,77,77,0.3) !important;
+  box-shadow: 0 0 12px rgba(255,77,77,0.4) !important;
+  color: white !important;
+}
+
+/* SUCCESS ICON OVERRIDE */
+.swal2-icon.swal2-success {
+  border-color: var(--neon-green) !important;
+  color: var(--neon-green) !important;
+}
+
+.swal2-icon.swal2-success [class^='swal2-success-line'] {
+  background-color: var(--neon-green) !important;
+}
+
+/* ERROR ICON OVERRIDE */
+.swal2-icon.swal2-error {
+  border-color: #ff4d4d !important;
+  color: #ff4d4d !important;
+}
+
+/* WARNING ICON (yellow) */
+.swal2-icon.swal2-warning {
+  border-color: #ffcc00 !important;
+  color: #ffcc00 !important;
 }
