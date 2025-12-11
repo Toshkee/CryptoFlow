@@ -36,7 +36,7 @@ export default function HomePage() {
           <div className="hero-cta">
             <button
               className="hero-primary-btn"
-              onClick={() => navigate("/trade")}
+              onClick={() => navigate("/signup")}
             >
               Get Started
             </button>
