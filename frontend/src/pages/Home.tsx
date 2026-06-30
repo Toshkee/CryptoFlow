@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/providers/AuthProvider'
 import { useBinanceTickers } from '@/hooks/useBinanceTickers'
+import { CoinIcon } from '@/components/coin/CoinIcon'
 import { Button } from '@/components/ui/button'
 import { Price } from '@/components/live/Price'
 import { ChangePill } from '@/components/live/ChangePill'
@@ -96,21 +97,13 @@ export default function Home() {
               <div className="space-y-1">
                 {HERO_ROWS.map((s) => {
                   const t = tickers[s]
-                  const up = (t?.changePct ?? 0) >= 0
                   return (
                     <div
                       key={s}
                       className="flex items-center justify-between rounded-lg px-3 py-3 transition-colors hover:bg-surface-2"
                     >
                       <div className="flex items-center gap-3">
-                        <span
-                          className={cn(
-                            'grid size-9 place-items-center rounded-full text-xs font-bold',
-                            up ? 'bg-up-soft text-up' : 'bg-down-soft text-down',
-                          )}
-                        >
-                          {base(s).slice(0, 3)}
-                        </span>
+                        <CoinIcon symbol={base(s)} size={36} />
                         <div>
                           <div className="font-semibold">{base(s)}</div>
                           <div className="text-xs text-faint">{base(s)} / USDT · Perp</div>

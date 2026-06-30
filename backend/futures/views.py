@@ -6,6 +6,7 @@ from django.utils import timezone
 from decimal import Decimal, InvalidOperation
 
 from markets.prices import get_futures_price, PriceUnavailable
+from markets.models import SpotWallet
 
 from .models import FuturesWallet, FuturesPosition
 from .utils import calculate_contracts, liquidation_price, calculate_pnl
@@ -22,6 +23,77 @@ def get_wallet(request):
 
     return Response({
         "balance": str(wallet.balance)
+    })
+
+
+# ---------------------------------------------------------
+# TRANSFER FUNDS  (spot wallet  <->  futures / trading wallet)
+# ---------------------------------------------------------
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def transfer_funds(request):
+    """Move cash between the user's spot wallet and futures (trading) wallet.
+
+    Body: {"direction": "to_futures" | "to_spot", "amount": <number>}
+
+    Both wallet rows are locked with select_for_update inside ONE atomic
+    transaction, so a concurrent transfer or trade can't double-spend the moved
+    amount. We always acquire the locks in the same order (futures then spot) so
+    two transfers in opposite directions can't deadlock.
+    """
+    user = request.user
+
+    direction = request.data.get("direction")
+    if direction not in ("to_futures", "to_spot"):
+        return Response(
+            {"error": "direction must be 'to_futures' or 'to_spot'"}, status=400
+        )
+
+    try:
+        amount = Decimal(str(request.data.get("amount")))
+        # Reject NaN/Infinity before they reach quantize() (which would raise
+        # InvalidOperation and 500 instead of a clean 400).
+        if not amount.is_finite():
+            raise InvalidOperation
+        # The futures wallet stores 2 decimal places; quantize to cents so a
+        # high-precision input can't be rejected by the DB or leave dust behind.
+        # Oversized magnitudes (e.g. "1e27") raise InvalidOperation here too.
+        amount = amount.quantize(Decimal("0.01"))
+    except (InvalidOperation, ValueError, TypeError):
+        return Response({"error": "Invalid amount"}, status=400)
+
+    if amount <= 0:
+        return Response({"error": "Amount must be positive"}, status=400)
+
+    with transaction.atomic():
+        futures, _ = FuturesWallet.objects.get_or_create(user=user)
+        spot, _ = SpotWallet.objects.get_or_create(user=user)
+        # Lock both rows (consistent order avoids deadlocks).
+        futures = FuturesWallet.objects.select_for_update().get(pk=futures.pk)
+        spot = SpotWallet.objects.select_for_update().get(pk=spot.pk)
+
+        if direction == "to_futures":
+            if spot.balance < amount:
+                return Response({"error": "Insufficient spot balance"}, status=400)
+            spot.balance -= amount
+            futures.balance += amount
+        else:  # to_spot
+            if futures.balance < amount:
+                return Response(
+                    {"error": "Insufficient futures balance"}, status=400
+                )
+            futures.balance -= amount
+            spot.balance += amount
+
+        spot.save()
+        futures.save()
+
+    return Response({
+        "message": "Transfer successful",
+        "direction": direction,
+        "amount": str(amount),
+        "futures_balance": str(futures.balance),
+        "spot_balance": str(spot.balance),
     })
 
 

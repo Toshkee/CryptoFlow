@@ -53,6 +53,27 @@ export function useClosePosition() {
   })
 }
 
+export interface TransferResult {
+  message: string
+  direction: 'to_futures' | 'to_spot'
+  amount: string
+  futures_balance: string
+  spot_balance: string
+}
+
+/** Move cash between the spot wallet and the futures (trading) wallet. */
+export function useTransferFunds() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { direction: 'to_futures' | 'to_spot'; amount: string }) =>
+      apiPost<TransferResult>('/futures/transfer/', body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.futuresWallet })
+      qc.invalidateQueries({ queryKey: qk.spotWallet })
+    },
+  })
+}
+
 /* ---------------- Markets (spot) ---------------- */
 
 export function useTop100() {
@@ -84,6 +105,9 @@ export function useSpotWallet() {
   return useQuery({
     queryKey: qk.spotWallet,
     queryFn: () => apiGet<SpotWallet>('/markets/wallet/'),
+    // Reconcile amounts/avg-price periodically; live USD valuation is layered on
+    // top client-side from the Binance spot stream (see Wallet page).
+    refetchInterval: 15_000,
   })
 }
 

@@ -1,16 +1,18 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'motion/react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, ArrowRightLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { MARKETS, useUIStore, type OrderSide, type TradeInterval } from '@/stores/useUIStore'
 import { useBinanceStream } from '@/hooks/useBinanceStream'
 import type { Candle } from '@/components/charts/CandleChart'
 import { useBinanceTickers } from '@/hooks/useBinanceTickers'
+import { CoinIcon } from '@/components/coin/CoinIcon'
 import { useFuturesWallet, usePositions, useOpenPosition, useClosePosition } from '@/hooks/queries'
 import type { Position } from '@/types'
 import { CandleChart } from '@/components/charts/CandleChart'
 import { OrderBook } from '@/components/trade/OrderBook'
+import { TradesTape } from '@/components/trade/TradesTape'
 import { Price } from '@/components/live/Price'
 import { ChangePill } from '@/components/live/ChangePill'
 import { LiveDot } from '@/components/live/LiveDot'
@@ -20,15 +22,18 @@ import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { TransferDialog } from '@/components/trade/TransferDialog'
 import { formatPrice, formatSignedUsd, formatToken, formatUsd, toNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-const INTERVALS: TradeInterval[] = ['1m', '5m', '15m', '1h', '4h', '1d']
+const INTERVALS: TradeInterval[] = ['1m', '5m', '15m', '30m', '1h', '4h', '1d']
 const LEV_PRESETS = [5, 10, 20, 50, 100, 125]
 const base = (s: string) => s.replace('USDT', '')
 
 async function fetchKlines(symbol: string, interval: string): Promise<Candle[]> {
-  const r = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=300`)
+  // Binance spot REST (api.binance.com) — matches the spot streams we subscribe
+  // to and is reachable where the futures endpoints are geo-blocked.
+  const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=300`)
   const raw: (string | number)[][] = await r.json()
   return raw.map((c) => ({
     time: Math.floor(Number(c[0]) / 1000),
@@ -40,8 +45,9 @@ async function fetchKlines(symbol: string, interval: string): Promise<Candle[]> 
 }
 
 export default function Trade() {
-  const { symbol, interval, leverage, side, setSymbol, setInterval, setLeverage, setSide } = useUIStore()
-  const { price: markPrice, orderbook, candle, status } = useBinanceStream(symbol, interval)
+  const { symbol, interval, leverage, side, bookTab, setSymbol, setInterval, setLeverage, setSide, setBookTab } =
+    useUIStore()
+  const { price: markPrice, orderbook, candle, trades, status } = useBinanceStream(symbol, interval)
 
   const { data: positions } = usePositions()
   const { data: wallet } = useFuturesWallet()
@@ -63,6 +69,7 @@ export default function Trade() {
   })
 
   const [margin, setMargin] = useState('')
+  const [transferOpen, setTransferOpen] = useState(false)
 
   const priceFor = (sym: string) => (sym === symbol && markPrice ? markPrice : tickers[sym]?.price ?? null)
   const balance = toNumber(wallet?.balance)
@@ -114,7 +121,10 @@ export default function Trade() {
             <SelectContent>
               {MARKETS.map((m) => (
                 <SelectItem key={m} value={m}>
-                  {base(m)} <span className="text-faint">/ USDT</span>
+                  <span className="flex items-center gap-2">
+                    <CoinIcon symbol={m} size={18} />
+                    {base(m)} <span className="text-faint">/ USDT</span>
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -131,9 +141,20 @@ export default function Trade() {
             Perpetual
           </Badge>
 
-          <LiveDot status={status} className="ml-auto" />
+          <div className="ml-auto flex items-center gap-3 sm:gap-4">
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] uppercase text-faint">Trading balance</span>
+              <span className="font-num tabular-nums text-sm font-bold text-text">{formatUsd(balance)}</span>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setTransferOpen(true)}>
+              <ArrowRightLeft className="size-3.5" /> Transfer
+            </Button>
+            <LiveDot status={status} />
+          </div>
         </div>
       </div>
+
+      <TransferDialog open={transferOpen} onOpenChange={setTransferOpen} futuresBalance={balance} />
 
       {/* main grid */}
       <div className="grid gap-3 p-3 lg:grid-cols-[208px_1fr_320px]">
@@ -157,7 +178,8 @@ export default function Trade() {
                 >
                   <span className="flex items-center gap-2">
                     {active && <span className="h-3.5 w-0.5 rounded-full bg-accent" />}
-                    <span className={cn('font-medium', !active && 'pl-2.5')}>{base(m)}</span>
+                    <CoinIcon symbol={m} size={20} className={cn(!active && 'ml-2.5')} />
+                    <span className="font-medium">{base(m)}</span>
                   </span>
                   <span className="text-right">
                     <Price value={t?.price ?? null} className="block text-xs" flash={false} />
@@ -206,8 +228,31 @@ export default function Trade() {
 
         {/* right: orderbook + order form */}
         <div className="flex flex-col gap-3">
-          <div className="h-[320px] overflow-hidden rounded-xl border border-border bg-surface-1">
-            <OrderBook data={orderbook} markPrice={markPrice} />
+          <div className="flex h-[320px] flex-col overflow-hidden rounded-xl border border-border bg-surface-1">
+            <div className="flex shrink-0 border-b border-border">
+              {(['book', 'trades'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setBookTab(tab)}
+                  className={cn(
+                    'relative flex-1 px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors',
+                    bookTab === tab ? 'text-text' : 'text-muted hover:text-text',
+                  )}
+                >
+                  {tab === 'book' ? 'Order book' : 'Trades'}
+                  {bookTab === tab && (
+                    <motion.span layoutId="book-tab" className="absolute inset-x-0 bottom-0 h-0.5 bg-accent" />
+                  )}
+                </button>
+              ))}
+            </div>
+            <div className="min-h-0 flex-1">
+              {bookTab === 'book' ? (
+                <OrderBook data={orderbook} markPrice={markPrice} />
+              ) : (
+                <TradesTape trades={trades} markPrice={markPrice} />
+              )}
+            </div>
           </div>
 
           <div className="rounded-xl border border-border bg-surface-1 p-3">
@@ -355,7 +400,12 @@ function PositionsPanel({
                 const roe = margin ? (pnl / margin) * 100 : 0
                 return (
                   <tr key={p.id} className="border-t border-border">
-                    <td className="py-2.5 pl-3 font-semibold">{base(p.symbol)}</td>
+                    <td className="py-2.5 pl-3 font-semibold">
+                      <span className="flex items-center gap-2">
+                        <CoinIcon symbol={p.symbol} size={20} />
+                        {base(p.symbol)}
+                      </span>
+                    </td>
                     <td className="py-2.5">
                       <Badge variant={p.side === 'LONG' ? 'long' : 'short'}>{p.side}</Badge>
                     </td>

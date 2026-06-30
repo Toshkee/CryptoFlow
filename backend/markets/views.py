@@ -447,11 +447,14 @@ def convert(request):
         else:
             from_asset.save()
 
-        # Add to new asset
+        # Add to new asset. Prefer the client-supplied ticker (same trust model
+        # as buy) so the holding shows a real symbol like "ETH" — which also lets
+        # the frontend map it to a live Binance pair — falling back to a slug.
+        to_symbol = (request.data.get("to_symbol") or to_id[:5]).strip().upper()[:12]
         to_asset, _ = SpotAsset.objects.get_or_create(
             user=request.user,
             coin_id=to_id,
-            defaults={"symbol": to_id[:5].upper()},
+            defaults={"symbol": to_symbol or to_id[:5].upper()},
         )
         to_asset = SpotAsset.objects.select_for_update().get(pk=to_asset.pk)
 

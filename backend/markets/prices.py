@@ -7,8 +7,15 @@ to "buy" at a low price and "sell" at a high one to mint balance out of thin air
 Every settlement price is fetched HERE, server-side, and cached briefly so we
 don't hammer the upstream APIs on bursts of trades.
 
-  * Futures -> Binance USDⓈ-M  (fapi.binance.com)   ~3s cache
-  * Spot    -> CoinGecko         (api.coingecko.com) ~10s cache
+  * Mark price -> Binance spot index  (api.binance.com)  ~3s cache
+  * Spot       -> CoinGecko            (api.coingecko.com) ~10s cache
+
+NOTE on the mark price source: a perpetual's mark price tracks the underlying
+spot *index*, so we settle futures positions against Binance's spot ticker. It
+also happens to be reachable from far more regions than the USDⓈ-M futures
+endpoints (which are geo-restricted in many places), so the same price the
+browser streams live (spot) is the price the server settles at — no drift
+between the live unrealized PnL and the realized PnL on close.
 """
 
 from decimal import Decimal, InvalidOperation
@@ -20,7 +27,9 @@ from django.core.cache import cache
 # fail fast rather than tie up a worker. 5s is plenty for a single ticker call.
 REQUEST_TIMEOUT = 5
 
-BINANCE_FUTURES_TICKER = "https://fapi.binance.com/fapi/v1/ticker/price"
+# Binance spot ticker — used as the mark price (spot index) for futures
+# settlement. See the module docstring for why spot rather than fapi.
+BINANCE_MARK_TICKER = "https://api.binance.com/api/v3/ticker/price"
 
 FUTURES_PRICE_CACHE_SECONDS = 3
 SPOT_PRICE_CACHE_SECONDS = 10
@@ -51,7 +60,7 @@ def get_futures_price(symbol):
 
     try:
         resp = requests.get(
-            BINANCE_FUTURES_TICKER,
+            BINANCE_MARK_TICKER,
             params={"symbol": symbol},
             timeout=REQUEST_TIMEOUT,
         )

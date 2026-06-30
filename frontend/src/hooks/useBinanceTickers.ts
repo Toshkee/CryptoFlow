@@ -7,8 +7,10 @@ export interface Ticker {
 }
 
 /**
- * Subscribes to Binance futures 24h ticker streams for a fixed set of symbols.
+ * Subscribes to Binance spot 24h ticker streams for a fixed set of symbols.
  * No API key required — powers the live price strips on Home / Trade headers.
+ * Uses spot (`stream.binance.com`) rather than futures, which is geo-restricted
+ * in many regions — see useBinanceStream for the full rationale.
  */
 export function useBinanceTickers(symbols: string[]): Record<string, Ticker> {
   const [map, setMap] = useState<Record<string, Ticker>>({})
@@ -17,7 +19,7 @@ export function useBinanceTickers(symbols: string[]): Record<string, Ticker> {
   useEffect(() => {
     if (!symbols.length) return
     const streams = symbols.map((s) => `${s.toLowerCase()}@ticker`).join('/')
-    const ws = new ReconnectingWebSocket(`wss://fstream.binance.com/stream?streams=${streams}`, [], {
+    const ws = new ReconnectingWebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`, [], {
       minReconnectionDelay: 1000,
       maxReconnectionDelay: 10000,
     })

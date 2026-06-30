@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Star } from 'lucide-react'
 import { useTop100 } from '@/hooks/queries'
 import type { Coin } from '@/types'
+import { CoinIcon } from '@/components/coin/CoinIcon'
 import { Sparkline } from '@/components/charts/Sparkline'
 import { ChangePill } from '@/components/live/ChangePill'
 import { Input } from '@/components/ui/input'
@@ -174,7 +175,7 @@ export default function Markets() {
                     <td className="py-3 pl-4 font-num text-faint">{(safePage - 1) * PER_PAGE + i + 1}</td>
                     <td className="py-3">
                       <div className="flex items-center gap-3">
-                        <img src={coin.image} alt="" className="size-7 rounded-full" loading="lazy" />
+                        <CoinIcon symbol={coin.symbol} src={coin.image} size={28} />
                         <div>
                           <div className="font-semibold">{coin.symbol.toUpperCase()}</div>
                           <div className="text-xs text-faint">{coin.name}</div>

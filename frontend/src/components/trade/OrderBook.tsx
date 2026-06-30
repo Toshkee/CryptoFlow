@@ -36,13 +36,16 @@ export function OrderBook({ data, markPrice }: { data: OrderBookData; markPrice:
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted">Order book</span>
-        <span className="font-num text-[11px] text-faint">Size</span>
+      <div className="flex items-center justify-between border-b border-border px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+        <span>Price</span>
+        <span>Size</span>
       </div>
 
-      {/* asks (reversed so best ask sits just above the spread) */}
-      <div className="flex flex-1 flex-col justify-end">
+      {/* asks (reversed so best ask sits just above the spread). min-h-0 +
+          overflow-hidden lets the half shrink and clips the far levels, so the
+          rows nearest the spread always stay visible instead of pushing the
+          bids off the bottom of the panel. */}
+      <div className="flex min-h-0 flex-1 flex-col justify-end overflow-hidden">
         {[...asks.rows].reverse().map((r, i) => (
           <Level key={`a-${i}`} row={r} max={max} side="ask" dp={dp} />
         ))}
@@ -56,8 +59,8 @@ export function OrderBook({ data, markPrice }: { data: OrderBookData; markPrice:
         </span>
       </div>
 
-      {/* bids */}
-      <div className="flex flex-1 flex-col">
+      {/* bids (best bid first, just below the spread; far levels clipped) */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {bids.rows.map((r, i) => (
           <Level key={`b-${i}`} row={r} max={max} side="bid" dp={dp} />
         ))}

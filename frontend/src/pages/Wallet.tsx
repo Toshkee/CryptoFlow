@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts'
-import { ArrowDownToLine, ArrowUpFromLine, Loader2, Repeat, TrendingDown } from 'lucide-react'
+import { ArrowDownToLine, ArrowUpFromLine, ArrowRightLeft, Loader2, Repeat, TrendingDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiGet } from '@/lib/api'
-import { useSpotWallet, useSpotMutation } from '@/hooks/queries'
+import { useSpotWallet, useSpotMutation, useFuturesWallet, useTop100 } from '@/hooks/queries'
+import { useBinanceTickers } from '@/hooks/useBinanceTickers'
+import { CoinIcon } from '@/components/coin/CoinIcon'
+import { TransferDialog } from '@/components/trade/TransferDialog'
 import type { SpotAsset } from '@/types'
 import { AnimatedNumber } from '@/components/live/AnimatedNumber'
 import { Button } from '@/components/ui/button'
@@ -27,25 +30,48 @@ type ModalKind = null | 'deposit' | 'withdraw' | 'sell' | 'convert'
 
 export default function Wallet() {
   const { data, isLoading } = useSpotWallet()
+  const { data: futures } = useFuturesWallet()
+  const { data: coins } = useTop100()
   const deposit = useSpotMutation<{ amount: string }>('/markets/wallet/deposit/')
   const withdraw = useSpotMutation<{ amount: string }>('/markets/wallet/withdraw/')
   const sell = useSpotMutation<{ coin_id: string; amount: string; price: string }>('/markets/wallet/sell/')
-  const convert = useSpotMutation<{ from_coin: string; to_coin: string; amount: string }>('/markets/wallet/convert/')
+  const convert = useSpotMutation<{ from_coin: string; to_coin: string; amount: string; to_symbol?: string }>('/markets/wallet/convert/')
 
   const [modal, setModal] = useState<ModalKind>(null)
+  const [transferOpen, setTransferOpen] = useState(false)
   const [amount, setAmount] = useState('')
   const [activeAsset, setActiveAsset] = useState<SpotAsset | null>(null)
   const [convertTo, setConvertTo] = useState('')
   const [preview, setPreview] = useState<{ to_amount: string; to_symbol: string } | null>(null)
 
-  const balance = toNumber(data?.balance)
-  const assetValue = toNumber(data?.total_asset_value)
-  const equity = balance + assetValue
   const assets = data?.assets ?? []
 
-  const pieData = assets
-    .map((a) => ({ symbol: a.symbol.toUpperCase(), value: toNumber(a.usd_value) }))
+  // Value holdings off the live Binance spot stream so the portfolio ticks in
+  // real time, instead of sitting frozen on the snapshot from the last fetch.
+  const tickerSymbols = useMemo(() => assets.map((a) => `${a.symbol.toUpperCase()}USDT`), [assets])
+  const tickers = useBinanceTickers(tickerSymbols)
+  const liveAssets = assets.map((a) => {
+    const livePrice = tickers[`${a.symbol.toUpperCase()}USDT`]?.price ?? toNumber(a.live_price)
+    return { ...a, livePrice, liveValue: toNumber(a.amount) * livePrice }
+  })
+
+  const balance = toNumber(data?.balance)
+  const futuresBalance = toNumber(futures?.balance)
+  const assetValue = liveAssets.reduce((sum, a) => sum + a.liveValue, 0)
+  // Net worth = spot cash + crypto + trading (futures). Excluding futures made an
+  // internal spot->futures transfer look like a loss and the breakdown below not
+  // add up to the headline; include it so the total matches its own parts.
+  const equity = balance + assetValue + futuresBalance
+
+  const pieData = liveAssets
+    .map((a) => ({ symbol: a.symbol.toUpperCase(), value: a.liveValue }))
     .filter((d) => d.value > 0)
+
+  // Convert targets = any market coin (not just ones already held), minus the
+  // asset being converted from. Falls back to held assets if the market list
+  // hasn't loaded yet so the dropdown is never empty.
+  const convertTargets = (coins?.length ? coins : assets.map((a) => ({ id: a.coin_id, symbol: a.symbol, name: a.symbol.toUpperCase() })))
+    .filter((c) => c.id !== activeAsset?.coin_id)
 
   const close = () => {
     setModal(null)
@@ -97,7 +123,8 @@ export default function Wallet() {
   const runConvert = async () => {
     if (!activeAsset || !convertTo) return
     try {
-      await convert.mutateAsync({ from_coin: activeAsset.coin_id, to_coin: convertTo, amount })
+      const toSymbol = convertTargets.find((c) => c.id === convertTo)?.symbol
+      await convert.mutateAsync({ from_coin: activeAsset.coin_id, to_coin: convertTo, amount, to_symbol: toSymbol })
       toast.success('Conversion complete')
       close()
     } catch (e) {
@@ -121,7 +148,7 @@ export default function Wallet() {
               <div className="mt-1 text-4xl font-bold tracking-tight">
                 <AnimatedNumber value={equity} format={{ style: 'currency', currency: 'USD' }} />
               </div>
-              <div className="mt-4 flex gap-6 text-sm">
+              <div className="mt-4 flex flex-wrap gap-6 text-sm">
                 <div>
                   <div className="text-faint">Cash</div>
                   <div className="font-num font-semibold tabular-nums">{formatUsd(balance)}</div>
@@ -130,22 +157,32 @@ export default function Wallet() {
                   <div className="text-faint">Crypto</div>
                   <div className="font-num font-semibold tabular-nums">{formatUsd(assetValue)}</div>
                 </div>
+                <div>
+                  <div className="text-faint">Trading (Futures)</div>
+                  <div className="font-num font-semibold tabular-nums">{formatUsd(futuresBalance)}</div>
+                </div>
               </div>
-              <div className="mt-5 flex gap-2">
+              <div className="mt-5 flex flex-wrap gap-2">
                 <Button size="sm" onClick={() => setModal('deposit')}>
                   <ArrowDownToLine /> Deposit
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => setModal('withdraw')}>
                   <ArrowUpFromLine /> Withdraw
                 </Button>
+                <Button size="sm" variant="outline" onClick={() => setTransferOpen(true)}>
+                  <ArrowRightLeft /> Transfer
+                </Button>
               </div>
             </div>
 
             {pieData.length > 0 && (
-              <div className="relative grid place-items-center">
+              // Kill Recharts' default SVG focus outlines (the box around the
+              // chart + the arc rings on a clicked slice). The allocation is also
+              // shown as a text legend, so the chart itself needn't be focusable.
+              <div className="relative grid place-items-center [&_*:focus]:outline-none [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none">
                 <ResponsiveContainer width="100%" height={180}>
                   <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="symbol" innerRadius={56} outerRadius={82} paddingAngle={2} stroke="none">
+                    <Pie data={pieData} dataKey="value" nameKey="symbol" innerRadius={56} outerRadius={82} paddingAngle={2} stroke="none" rootTabIndex={-1}>
                       {pieData.map((_, i) => (
                         <Cell key={i} fill={COLORS[i % COLORS.length]} />
                       ))}
@@ -209,19 +246,19 @@ export default function Wallet() {
                 </tr>
               </thead>
               <tbody>
-                {assets.map((a) => (
+                {liveAssets.map((a) => (
                   <tr key={a.coin_id} className="border-t border-border hover:bg-surface-1">
                     <td className="py-3 pl-4">
                       <div className="flex items-center gap-2">
-                        <span className="grid size-8 place-items-center rounded-full bg-surface-3 text-xs font-bold">
-                          {a.symbol.slice(0, 3).toUpperCase()}
-                        </span>
+                        <CoinIcon symbol={a.symbol} size={32} />
                         <span className="font-semibold">{a.symbol.toUpperCase()}</span>
                       </div>
                     </td>
                     <td className="py-3 text-right font-num tabular-nums">{formatToken(a.amount)}</td>
                     <td className="py-3 text-right font-num tabular-nums text-muted">${formatToken(a.avg_price, 4)}</td>
-                    <td className="py-3 pr-4 text-right font-num font-semibold tabular-nums">{formatUsd(a.usd_value)}</td>
+                    <td className="py-3 pr-4 text-right font-num font-semibold tabular-nums">
+                      <AnimatedNumber value={a.liveValue} format={{ style: 'currency', currency: 'USD' }} />
+                    </td>
                     <td className="py-3 pr-4">
                       <div className="flex justify-end gap-2">
                         <Button
@@ -326,14 +363,15 @@ export default function Wallet() {
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select asset" />
                 </SelectTrigger>
-                <SelectContent>
-                  {assets
-                    .filter((x) => x.coin_id !== activeAsset?.coin_id)
-                    .map((x) => (
-                      <SelectItem key={x.coin_id} value={x.coin_id}>
-                        {x.symbol.toUpperCase()}
-                      </SelectItem>
-                    ))}
+                <SelectContent className="max-h-72">
+                  {convertTargets.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      <span className="flex items-center gap-2">
+                        <CoinIcon symbol={c.symbol} src={(c as { image?: string }).image} size={18} />
+                        {c.symbol.toUpperCase()} <span className="text-faint">· {c.name}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -369,6 +407,8 @@ export default function Wallet() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <TransferDialog open={transferOpen} onOpenChange={setTransferOpen} futuresBalance={toNumber(futures?.balance)} />
     </div>
   )
 }
