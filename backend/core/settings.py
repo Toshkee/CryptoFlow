@@ -45,6 +45,8 @@ if not SECRET_KEY:
 # HOSTS / CORS / CSRF
 # -------------------------------------------------------------------
 HEROKU_APP_NAME = os.getenv("HEROKU_APP_NAME")  # e.g. "crypto-flow-8b8fe5dcb0bc"
+# Render injects this on every service automatically, e.g. "cryptoflow-api.onrender.com".
+RENDER_EXTERNAL_HOSTNAME = os.getenv("RENDER_EXTERNAL_HOSTNAME")
 DEPLOYED_FRONTEND_URL = os.getenv("DEPLOYED_FRONTEND_URL")
 DEPLOYED_BACKEND_URL = os.getenv("DEPLOYED_BACKEND_URL")
 
@@ -59,6 +61,11 @@ if HEROKU_APP_NAME:
     host = f"{HEROKU_APP_NAME}.herokuapp.com"
     if host not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(host)
+
+# Render sets RENDER_EXTERNAL_HOSTNAME automatically; without it Django rejects
+# every request to the .onrender.com host with DisallowedHost (HTTP 400).
+if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
 # Extend ALLOWED_HOSTS from a comma-separated env var (e.g. a custom domain)
 # without editing code on every new deploy target.
@@ -91,6 +98,11 @@ CSRF_TRUSTED_ORIGINS = [
 
 if DEPLOYED_BACKEND_URL and DEPLOYED_BACKEND_URL not in CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS.append(DEPLOYED_BACKEND_URL)
+
+if RENDER_EXTERNAL_HOSTNAME:
+    render_origin = f"https://{RENDER_EXTERNAL_HOSTNAME}"
+    if render_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(render_origin)
 
 CORS_ALLOW_CREDENTIALS = True
 

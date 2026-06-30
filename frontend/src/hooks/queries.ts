@@ -11,12 +11,19 @@ export const qk = {
   spotWallet: ['markets', 'spotWallet'] as const,
 }
 
+// Auth-only endpoints (wallets, positions) 401 for anonymous visitors. Some live
+// on public pages (e.g. CoinDetail uses the spot wallet for the Buy dialog), so
+// gate those queries on having a token — otherwise a logged-out visit fires a
+// doomed 401 and gets bounced to /signin.
+const isAuthed = () => !!localStorage.getItem('access')
+
 /* ---------------- Futures ---------------- */
 
 export function useFuturesWallet() {
   return useQuery({
     queryKey: qk.futuresWallet,
     queryFn: () => apiGet<FuturesWallet>('/futures/wallet/'),
+    enabled: isAuthed(),
     refetchInterval: 10_000,
   })
 }
@@ -25,6 +32,7 @@ export function usePositions() {
   return useQuery({
     queryKey: qk.positions,
     queryFn: () => apiGet<Position[]>('/futures/positions/'),
+    enabled: isAuthed(),
     refetchInterval: 8_000,
   })
 }
@@ -105,6 +113,7 @@ export function useSpotWallet() {
   return useQuery({
     queryKey: qk.spotWallet,
     queryFn: () => apiGet<SpotWallet>('/markets/wallet/'),
+    enabled: isAuthed(),
     // Reconcile amounts/avg-price periodically; live USD valuation is layered on
     // top client-side from the Binance spot stream (see Wallet page).
     refetchInterval: 15_000,

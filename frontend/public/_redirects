@@ -1,0 +1,5 @@
+# SPA fallback: this is a client-side-routed React app (react-router).
+# Without this, any non-root URL (/markets, /signin, /coin/bitcoin) — whether
+# deep-linked, refreshed, or reached via a hard navigation — returns Netlify's
+# "Page not found" instead of index.html. The 200 keeps the original URL.
+/*    /index.html    200

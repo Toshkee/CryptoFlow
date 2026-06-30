@@ -95,14 +95,23 @@ async function request<T = unknown>(
   let res = await send(getAccess())
 
   if (res.status === 401) {
+    // Only a session that *existed* can expire. A public page (e.g. CoinDetail)
+    // that happens to hit an auth-only endpoint while logged out must NOT hijack
+    // an anonymous visitor to /signin — that produced the "session expired →
+    // page not found" bounce. We force-logout only when a refresh token was
+    // actually present (a real, now-expired session).
+    const hadSession = !!getRefresh()
     const newToken = await refreshAccess()
     if (!newToken) {
-      localStorage.clear()
-      if (!location.pathname.startsWith('/signin')) {
-        toast.error('Session expired', { description: 'Please sign in again.' })
-        setTimeout(() => (location.href = '/signin'), 600)
+      if (hadSession) {
+        localStorage.clear()
+        if (!location.pathname.startsWith('/signin')) {
+          toast.error('Session expired', { description: 'Please sign in again.' })
+          setTimeout(() => (location.href = '/signin'), 600)
+        }
+        throw new ApiError('Session expired', 401)
       }
-      throw new ApiError('Session expired', 401)
+      throw new ApiError('Not authenticated', 401)
     }
     res = await send(newToken)
   }

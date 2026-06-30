@@ -16,7 +16,7 @@ services:
     runtime: python
     plan: free
     rootDir: .
-    buildCommand: "pip install -r requirements.txt && python backend/manage.py collectstatic --noinput && python backend/manage.py migrate --noinput"
+    buildCommand: "pip install -r requirements.txt && python backend/manage.py collectstatic --noinput && python backend/manage.py migrate --noinput && python backend/manage.py seed_demo"
     startCommand: "gunicorn core.wsgi:application --chdir backend"
     healthCheckPath: /api/health/
     envVars:
@@ -31,7 +31,7 @@ services:
           name: cryptoflow-db
           property: connectionString
       - key: DEPLOYED_FRONTEND_URL
-        sync: false # set to your static-site URL, e.g. https://cryptoflow.netlify.app
+        value: https://cryptofloww.netlify.app # the live Netlify frontend (CORS origin)
       - key: COINGECKO_API_KEY
         sync: false
       - key: CLOUDINARY_CLOUD_NAME
