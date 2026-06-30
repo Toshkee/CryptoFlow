@@ -19,6 +19,16 @@ class FuturesWallet(models.Model):
         default=Decimal("10000.00")
     )
 
+    class Meta:
+        # DB-level safety net: even if application logic has a bug, the
+        # database refuses to persist a negative wallet balance.
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(balance__gte=0),
+                name="futureswallet_balance_non_negative",
+            ),
+        ]
+
     def __str__(self):
         return f"{self.user.username} Futures Wallet (${self.balance})"
 

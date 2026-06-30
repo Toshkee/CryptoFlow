@@ -17,6 +17,16 @@ class SpotWallet(models.Model):
         default=Decimal("0")
     )
 
+    class Meta:
+        # DB-level safety net: the database refuses to persist a negative
+        # wallet balance even if application logic has a bug.
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(balance__gte=0),
+                name="spotwallet_balance_non_negative",
+            ),
+        ]
+
     def __str__(self):
         return f"{self.user.username} Spot Wallet (${self.balance})"
 

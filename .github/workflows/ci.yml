@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Backend: pytest against a real Postgres service (so the select_for_update
+  # concurrency tests, which are SKIPPED on SQLite, actually run).
+  # ---------------------------------------------------------------------------
+  backend:
+    name: backend (pytest + Postgres)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cryptoflow
+          POSTGRES_PASSWORD: cryptoflow
+          POSTGRES_DB: cryptoflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      SECRET_KEY: ci-only-9f3a2c7b1e6d4805af927c3b0e5d1a8462fb7390cd14e25a-not-prod
+      DATABASE_URL: postgres://cryptoflow:cryptoflow@localhost:5432/cryptoflow
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # NOTE: settings.py requires SSL whenever DEBUG is off + DATABASE_URL is
+      # set (ssl_require = not DEBUG). The Actions postgres service does not
+      # offer SSL, so the DB-touching steps run with DEBUG=True. This does NOT
+      # weaken the concurrency test: it skips only on connection.vendor ==
+      # 'sqlite', and here the vendor is 'postgresql', so the strict threaded
+      # double-spend assertions run for real. The production-hardening settings
+      # are validated separately by `check --deploy` below (DEBUG=False).
+      - name: Migrate (Postgres)
+        working-directory: backend
+        env:
+          DEBUG: "True"
+        run: python manage.py migrate
+
+      - name: Run pytest (Postgres)
+        working-directory: backend
+        env:
+          DEBUG: "True"
+        run: pytest -q
+
+      - name: Django deploy checks
+        working-directory: backend
+        env:
+          DEBUG: "False"
+        run: python manage.py check --deploy --fail-level ERROR
+
+  # ---------------------------------------------------------------------------
+  # Frontend: typecheck, unit tests (Vitest), and a production build.
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: frontend (tsc + vitest + build)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build

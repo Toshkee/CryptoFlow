@@ -1,11 +1,18 @@
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import (
+    api_view,
+    permission_classes,
+    throttle_classes,
+)
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.throttling import ScopedRateThrottle
 
 from django.contrib.auth import authenticate
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -16,6 +23,7 @@ import cloudinary.uploader
 
 
 @api_view(["POST"])
+@throttle_classes([ScopedRateThrottle])
 def signup(request):
     serializer = SignupSerializer(data=request.data)
     if serializer.is_valid():
@@ -25,6 +33,7 @@ def signup(request):
 
 
 @api_view(["POST"])
+@throttle_classes([ScopedRateThrottle])
 def login(request):
     username = request.data.get("username")
     password = request.data.get("password")
@@ -42,6 +51,14 @@ def login(request):
     })
 
 
+# ScopedRateThrottle reads `throttle_scope` off the view. @api_view wraps each
+# function in a generated APIView subclass reachable via `.cls`, so we attach
+# the scope there. Rates live in REST_FRAMEWORK.DEFAULT_THROTTLE_RATES.
+# These tight per-IP limits blunt credential-stuffing / signup abuse.
+login.cls.throttle_scope = "login"
+signup.cls.throttle_scope = "signup"
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def me(request):
@@ -54,7 +71,7 @@ def logout(request):
     refresh = request.data.get("refresh")
     try:
         RefreshToken(refresh).blacklist()
-    except:
+    except Exception:
         return Response({"error": "Invalid token"}, status=400)
 
     return Response({"message": "Logged out"})
@@ -96,8 +113,12 @@ def change_password(request):
     if not check_password(old_pw, user.password):
         return Response({"error": "Incorrect old password"}, status=400)
 
-    if len(new_pw) < 6:
-        return Response({"error": "Password too short"}, status=400)
+    # Enforce the full AUTH_PASSWORD_VALIDATORS suite instead of a naive
+    # len < 6 check, and surface failures as a clean DRF 400.
+    try:
+        validate_password(new_pw, user)
+    except DjangoValidationError as exc:
+        return Response({"error": exc.messages}, status=400)
 
     user.set_password(new_pw)
     user.save()

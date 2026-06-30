@@ -1,9 +1,16 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from django.core.cache import cache
-from rest_framework.decorators import api_view, permission_classes
+from django.db import transaction
+from rest_framework.decorators import (
+    api_view,
+    permission_classes,
+    throttle_classes,
+)
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from .models import SpotWallet, SpotAsset
+from .prices import get_spot_price, PriceUnavailable
 import requests
 import os
 
@@ -18,11 +25,11 @@ def cg(endpoint, params=None):
     url = f"{BASE}{endpoint}"
 
     try:
-        r = requests.get(url, headers=headers, params=params, timeout=10)
+        r = requests.get(url, headers=headers, params=params, timeout=5)
         r.raise_for_status()
         return r.json()
     except Exception as e:
-        print("❌ COINGECKO ERROR:", e)
+        print("COINGECKO ERROR:", e)
         return None
 
 
@@ -36,6 +43,7 @@ def get_or_create_wallet(user):
 
 # TOP 100
 @api_view(["GET"])
+@throttle_classes([ScopedRateThrottle])
 def top_100(request):
     cached = cache.get("top100_cache")
     if cached:
@@ -59,6 +67,7 @@ def top_100(request):
 
 # TOP 8 for homepage
 @api_view(["GET"])
+@throttle_classes([ScopedRateThrottle])
 def top8(request):
     cached = cache.get("top8_cache")
     if cached:
@@ -82,6 +91,7 @@ def top8(request):
 
 # COIN DETAIL
 @api_view(["GET"])
+@throttle_classes([ScopedRateThrottle])
 def market_detail(request, coin_id):
     cache_key = f"coin_detail_{coin_id}"
     cached = cache.get(cache_key)
@@ -105,6 +115,14 @@ def market_detail(request, coin_id):
     payload = {"info": info, "chart": chart}
     cache.set(cache_key, payload, timeout=60)
     return Response(payload)
+
+
+# ScopedRateThrottle reads `throttle_scope` off the view. @api_view wraps each
+# function in a generated APIView subclass reachable via `.cls`, so we set the
+# "market" scope there (rate configured in REST_FRAMEWORK.DEFAULT_THROTTLE_RATES).
+top_100.cls.throttle_scope = "market"
+top8.cls.throttle_scope = "market"
+market_detail.cls.throttle_scope = "market"
 
 
 # ===================== SPOT WALLET =====================
@@ -170,18 +188,22 @@ def spot_wallet(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def deposit(request):
-    wallet = get_or_create_wallet(request.user)
-
     try:
-        amt = Decimal(request.data.get("amount"))
-    except Exception:
+        amt = Decimal(str(request.data.get("amount")))
+    except (InvalidOperation, ValueError, TypeError):
         return Response({"error": "Invalid amount"}, status=400)
 
     if amt <= 0:
         return Response({"error": "Amount must be positive"}, status=400)
 
-    wallet.balance += amt
-    wallet.save()
+    # Atomic + row lock: read-modify-write on a balance must be serialized so
+    # concurrent deposits can't clobber each other. (No-op on SQLite, correct
+    # on Postgres — the production target.)
+    with transaction.atomic():
+        wallet = get_or_create_wallet(request.user)
+        wallet = SpotWallet.objects.select_for_update().get(pk=wallet.pk)
+        wallet.balance += amt
+        wallet.save()
 
     return Response(
         {"message": "Deposit successful", "balance": str(wallet.balance)}
@@ -193,21 +215,25 @@ def deposit(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def withdraw(request):
-    wallet = get_or_create_wallet(request.user)
-
     try:
-        amt = Decimal(request.data.get("amount"))
-    except Exception:
+        amt = Decimal(str(request.data.get("amount")))
+    except (InvalidOperation, ValueError, TypeError):
         return Response({"error": "Invalid amount"}, status=400)
 
     if amt <= 0:
         return Response({"error": "Amount must be positive"}, status=400)
 
-    if amt > wallet.balance:
-        return Response({"error": "Insufficient balance"}, status=400)
+    # Balance check happens INSIDE the locked transaction so a concurrent
+    # withdraw can't pass the check against a stale balance and overdraw.
+    with transaction.atomic():
+        wallet = get_or_create_wallet(request.user)
+        wallet = SpotWallet.objects.select_for_update().get(pk=wallet.pk)
 
-    wallet.balance -= amt
-    wallet.save()
+        if amt > wallet.balance:
+            return Response({"error": "Insufficient balance"}, status=400)
+
+        wallet.balance -= amt
+        wallet.save()
 
     return Response(
         {"message": "Withdraw successful", "balance": str(wallet.balance)}
@@ -219,43 +245,53 @@ def withdraw(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def buy(request):
-    wallet = get_or_create_wallet(request.user)
-
     coin_id = request.data.get("coin_id")
     symbol = request.data.get("symbol")
     amount_usd = request.data.get("amount")
-    price = request.data.get("price")
+    # NOTE: any client-supplied `price` is ignored (see SECURITY note below).
 
-    if not all([coin_id, symbol, amount_usd, price]):
+    if not all([coin_id, symbol, amount_usd]):
         return Response({"error": "Missing fields"}, status=400)
 
     try:
-        amount_usd = Decimal(amount_usd)
-        price = Decimal(price)
-    except Exception:
+        amount_usd = Decimal(str(amount_usd))
+    except (InvalidOperation, ValueError, TypeError):
         return Response({"error": "Invalid numbers"}, status=400)
 
     if amount_usd <= 0:
         return Response({"error": "Amount must be positive"}, status=400)
 
-    if wallet.balance < amount_usd:
-        return Response({"error": "Insufficient balance"}, status=400)
+    # SECURITY: settle at the authoritative server-side price, never the client's.
+    try:
+        price = get_spot_price(coin_id)
+    except PriceUnavailable:
+        return Response({"error": "Price data unavailable"}, status=503)
 
     qty = amount_usd / price
-    wallet.balance -= amount_usd
-    wallet.save()
 
-    asset, _ = SpotAsset.objects.get_or_create(
-        user=request.user, coin_id=coin_id, defaults={"symbol": symbol}
-    )
+    # Atomic: debit cash + credit the asset position together, both rows locked.
+    with transaction.atomic():
+        wallet = get_or_create_wallet(request.user)
+        wallet = SpotWallet.objects.select_for_update().get(pk=wallet.pk)
 
-    total_before = asset.amount * asset.avg_price
-    total_after = total_before + amount_usd
-    new_qty = asset.amount + qty
+        if wallet.balance < amount_usd:
+            return Response({"error": "Insufficient balance"}, status=400)
 
-    asset.avg_price = total_after / new_qty
-    asset.amount = new_qty
-    asset.save()
+        wallet.balance -= amount_usd
+        wallet.save()
+
+        asset, _ = SpotAsset.objects.get_or_create(
+            user=request.user, coin_id=coin_id, defaults={"symbol": symbol}
+        )
+        asset = SpotAsset.objects.select_for_update().get(pk=asset.pk)
+
+        total_before = asset.amount * asset.avg_price
+        total_after = total_before + amount_usd
+        new_qty = asset.amount + qty
+
+        asset.avg_price = total_after / new_qty
+        asset.amount = new_qty
+        asset.save()
 
     return Response({"message": "Buy successful"})
 
@@ -265,41 +301,54 @@ def buy(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def sell(request):
-    wallet = get_or_create_wallet(request.user)
-
     coin_id = request.data.get("coin_id")
     amount = request.data.get("amount")
-    price = request.data.get("price")
+    # NOTE: any client-supplied `price` is ignored (see SECURITY note below).
 
-    if not all([coin_id, amount, price]):
+    if not all([coin_id, amount]):
         return Response({"error": "Missing fields"}, status=400)
 
     try:
-        amount = Decimal(amount)
-        price = Decimal(price)
-    except Exception:
+        amount = Decimal(str(amount))
+    except (InvalidOperation, ValueError, TypeError):
         return Response({"error": "Invalid numbers"}, status=400)
 
     if amount <= 0:
         return Response({"error": "Amount must be positive"}, status=400)
 
-    asset = SpotAsset.objects.filter(user=request.user, coin_id=coin_id).first()
-    if not asset:
-        return Response({"error": "No such asset"}, status=400)
+    # SECURITY: settle at the authoritative server-side price, never the client's.
+    try:
+        price = get_spot_price(coin_id)
+    except PriceUnavailable:
+        return Response({"error": "Price data unavailable"}, status=503)
 
-    if amount > asset.amount:
-        return Response({"error": "Not enough coins"}, status=400)
+    # Atomic: debit the asset + credit cash together, both rows locked so a
+    # concurrent sell can't pass the holdings check against a stale amount.
+    with transaction.atomic():
+        wallet = get_or_create_wallet(request.user)
+        wallet = SpotWallet.objects.select_for_update().get(pk=wallet.pk)
 
-    usd_value = amount * price
-    asset.amount -= amount
+        asset = (
+            SpotAsset.objects.select_for_update()
+            .filter(user=request.user, coin_id=coin_id)
+            .first()
+        )
+        if not asset:
+            return Response({"error": "No such asset"}, status=400)
 
-    if asset.amount <= 0:
-        asset.delete()
-    else:
-        asset.save()
+        if amount > asset.amount:
+            return Response({"error": "Not enough coins"}, status=400)
 
-    wallet.balance += usd_value
-    wallet.save()
+        usd_value = amount * price
+        asset.amount -= amount
+
+        if asset.amount <= 0:
+            asset.delete()
+        else:
+            asset.save()
+
+        wallet.balance += usd_value
+        wallet.save()
 
     return Response({"message": "Sell successful", "returned": str(usd_value)})
 
@@ -317,20 +366,16 @@ def convert_preview(request):
         return Response({"error": "Missing parameters"}, status=400)
 
     try:
-        amount = Decimal(amount)
-    except Exception:
+        amount = Decimal(str(amount))
+    except (InvalidOperation, ValueError, TypeError):
         return Response({"error": "Invalid amount"}, status=400)
 
-    prices = cg(
-        "/simple/price",
-        params={"ids": f"{from_id},{to_id}", "vs_currencies": "usd"},
-    )
-
-    if not prices or from_id not in prices or to_id not in prices:
-        return Response({"error": "Price data unavailable"}, status=400)
-
-    p_from = Decimal(str(prices[from_id]["usd"]))
-    p_to = Decimal(str(prices[to_id]["usd"]))
+    # Read-only preview (no money moves), but still price server-side.
+    try:
+        p_from = get_spot_price(from_id)
+        p_to = get_spot_price(to_id)
+    except PriceUnavailable:
+        return Response({"error": "Price data unavailable"}, status=503)
 
     usd_value = amount * p_from
     to_amount = usd_value / p_to
@@ -356,8 +401,6 @@ def convert_preview(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def convert(request):
-    wallet = get_or_create_wallet(request.user)
-
     from_id = request.data.get("from_coin") or request.data.get("from_id")
     to_id = request.data.get("to_coin") or request.data.get("to_id")
     amount = request.data.get("amount")
@@ -366,56 +409,58 @@ def convert(request):
         return Response({"error": "Missing fields"}, status=400)
 
     try:
-        amount = Decimal(amount)
-    except Exception:
+        amount = Decimal(str(amount))
+    except (InvalidOperation, ValueError, TypeError):
         return Response({"error": "Invalid amount"}, status=400)
 
     if amount <= 0:
         return Response({"error": "Amount must be positive"}, status=400)
 
-    from_asset = SpotAsset.objects.filter(
-        user=request.user, coin_id=from_id
-    ).first()
-    if not from_asset:
-        return Response({"error": "You don't own this coin"}, status=400)
-
-    if amount > from_asset.amount:
-        return Response({"error": "Not enough balance to convert"}, status=400)
-
-    prices = cg(
-        "/simple/price",
-        params={"ids": f"{from_id},{to_id}", "vs_currencies": "usd"},
-    )
-
-    if not prices or from_id not in prices or to_id not in prices:
-        return Response({"error": "Price data unavailable"}, status=400)
-
-    p_from = Decimal(str(prices[from_id]["usd"]))
-    p_to = Decimal(str(prices[to_id]["usd"]))
+    # SECURITY: settle at authoritative server-side prices, never the client's.
+    try:
+        p_from = get_spot_price(from_id)
+        p_to = get_spot_price(to_id)
+    except PriceUnavailable:
+        return Response({"error": "Price data unavailable"}, status=503)
 
     usd_value = amount * p_from
     qty_to_receive = usd_value / p_to
 
-    # Deduct from old asset
-    from_asset.amount -= amount
-    if from_asset.amount <= 0:
-        from_asset.delete()
-    else:
-        from_asset.save()
+    # Atomic: debit the source asset + credit the destination asset together,
+    # both rows locked against concurrent converts.
+    with transaction.atomic():
+        from_asset = (
+            SpotAsset.objects.select_for_update()
+            .filter(user=request.user, coin_id=from_id)
+            .first()
+        )
+        if not from_asset:
+            return Response({"error": "You don't own this coin"}, status=400)
 
-    # Add to new asset
-    to_asset, _ = SpotAsset.objects.get_or_create(
-        user=request.user,
-        coin_id=to_id,
-        defaults={"symbol": to_id[:5].upper()},
-    )
+        if amount > from_asset.amount:
+            return Response({"error": "Not enough balance to convert"}, status=400)
 
-    total_before = to_asset.amount * to_asset.avg_price
-    total_after = total_before + usd_value
-    new_qty = to_asset.amount + qty_to_receive
+        # Deduct from old asset
+        from_asset.amount -= amount
+        if from_asset.amount <= 0:
+            from_asset.delete()
+        else:
+            from_asset.save()
 
-    to_asset.avg_price = total_after / new_qty if new_qty > 0 else p_to
-    to_asset.amount = new_qty
-    to_asset.save()
+        # Add to new asset
+        to_asset, _ = SpotAsset.objects.get_or_create(
+            user=request.user,
+            coin_id=to_id,
+            defaults={"symbol": to_id[:5].upper()},
+        )
+        to_asset = SpotAsset.objects.select_for_update().get(pk=to_asset.pk)
+
+        total_before = to_asset.amount * to_asset.avg_price
+        total_after = total_before + usd_value
+        new_qty = to_asset.amount + qty_to_receive
+
+        to_asset.avg_price = total_after / new_qty if new_qty > 0 else p_to
+        to_asset.amount = new_qty
+        to_asset.save()
 
     return Response({"message": "Conversion successful"})

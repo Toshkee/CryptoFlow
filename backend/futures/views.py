@@ -1,10 +1,11 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from django.db import transaction
 from django.utils import timezone
 from decimal import Decimal, InvalidOperation
 
-import requests
+from markets.prices import get_futures_price, PriceUnavailable
 
 from .models import FuturesWallet, FuturesPosition
 from .utils import calculate_contracts, liquidation_price, calculate_pnl
@@ -57,7 +58,10 @@ def get_open_positions(request):
 def open_position(request):
     user = request.user
 
-    required = ["symbol", "side", "margin", "leverage", "price"]
+    # NOTE: `price` is deliberately NOT required. The entry price is fetched
+    # server-side (see SECURITY note below); any client-supplied price is
+    # ignored. The frontend may still send one for its own optimistic UI.
+    required = ["symbol", "side", "margin", "leverage"]
     for field in required:
         if not request.data.get(field):
             return Response({"error": f"{field} is required"}, status=400)
@@ -66,7 +70,6 @@ def open_position(request):
     side = request.data["side"]
     margin = request.data["margin"]
     leverage = request.data["leverage"]
-    entry_price = request.data["price"]
 
     # BUY / SELL → LONG / SHORT
     side_map = {"BUY": "LONG", "SELL": "SHORT"}
@@ -80,43 +83,56 @@ def open_position(request):
         leverage = int(leverage)
         if not (1 <= leverage <= 125):
             return Response({"error": "Leverage must be between 1 and 125"}, status=400)
-    except:
+    except (ValueError, TypeError):
         return Response({"error": "Leverage must be an integer"}, status=400)
 
-    # Validate amounts
+    # Validate margin
     try:
-        margin = Decimal(margin)
-        entry_price = Decimal(entry_price)
-    except:
+        margin = Decimal(str(margin))
+    except (InvalidOperation, ValueError, TypeError):
         return Response({"error": "Invalid numeric values"}, status=400)
 
     if margin <= 0:
         return Response({"error": "Margin must be positive"}, status=400)
 
-    wallet, _ = FuturesWallet.objects.get_or_create(user=user)
+    symbol = symbol.upper()
 
-    if wallet.balance < margin:
-        return Response({"error": "Insufficient balance"}, status=400)
+    # SECURITY: authoritative entry price comes from Binance, server-side.
+    # A client-supplied price would let a user mint PnL out of thin air.
+    try:
+        entry_price = get_futures_price(symbol)
+    except PriceUnavailable:
+        return Response({"error": "Live price unavailable, please retry"}, status=503)
 
-    # Deduct
-    wallet.balance -= margin
-    wallet.save()
-
-    # Compute contract size
+    # Compute contract size + liquidation price from the authoritative entry.
     contracts = calculate_contracts(margin, entry_price, leverage)
     liq_price = liquidation_price(entry_price, leverage, backend_side)
 
-    # Create DB entry
-    pos = FuturesPosition.objects.create(
-        user=user,
-        symbol=symbol.upper(),
-        side=backend_side,
-        entry_price=entry_price,
-        amount=contracts,
-        leverage=leverage,
-        initial_margin=margin,
-        liquidation_price=liq_price,
-    )
+    # Atomic: the wallet debit and the position create must both apply or
+    # neither. select_for_update locks the wallet row so two concurrent opens
+    # can't double-spend the same balance.
+    # (select_for_update is a no-op on SQLite but correct on Postgres, the
+    # production target.)
+    with transaction.atomic():
+        wallet, _ = FuturesWallet.objects.get_or_create(user=user)
+        wallet = FuturesWallet.objects.select_for_update().get(pk=wallet.pk)
+
+        if wallet.balance < margin:
+            return Response({"error": "Insufficient balance"}, status=400)
+
+        wallet.balance -= margin
+        wallet.save()
+
+        pos = FuturesPosition.objects.create(
+            user=user,
+            symbol=symbol,
+            side=backend_side,
+            entry_price=entry_price,
+            amount=contracts,
+            leverage=leverage,
+            initial_margin=margin,
+            liquidation_price=liq_price,
+        )
 
     return Response({
         "message": "Position opened successfully",
@@ -134,7 +150,7 @@ def open_position(request):
 
 
 # ---------------------------------------------------------
-# CLOSE POSITION (AUTO-FETCHES LIVE PRICE)
+# CLOSE POSITION (settles at the live server-side price)
 # ---------------------------------------------------------
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -146,39 +162,42 @@ def close_position(request, position_id):
     except FuturesPosition.DoesNotExist:
         return Response({"error": "Position not found"}, status=404)
 
-    # Frontend may send price — optional
-    price = request.data.get("price")
+    # SECURITY: ignore any client-sent price; always settle at the live
+    # Binance price fetched server-side.
+    try:
+        current_price = get_futures_price(pos.symbol)
+    except PriceUnavailable:
+        return Response({"error": "Unable to fetch live price, please retry"}, status=503)
 
-    if price:
+    # Atomic so the position close and the wallet credit can't half-apply, and
+    # the re-fetch under select_for_update prevents a double-close race from
+    # crediting the margin twice. (No-op locking on SQLite, correct on Postgres.)
+    with transaction.atomic():
         try:
-            current_price = Decimal(price)
-        except:
-            return Response({"error": "Invalid price"}, status=400)
+            pos = FuturesPosition.objects.select_for_update().get(
+                id=position_id, user=user, status="OPEN"
+            )
+        except FuturesPosition.DoesNotExist:
+            return Response({"error": "Position not found"}, status=404)
 
-    else:
-        # AUTO-FETCH LIVE PRICE FROM BINANCE
-        try:
-            data = requests.get(
-                f"https://fapi.binance.com/fapi/v1/ticker/price?symbol={pos.symbol}"
-            ).json()
+        wallet, _ = FuturesWallet.objects.get_or_create(user=user)
+        wallet = FuturesWallet.objects.select_for_update().get(pk=wallet.pk)
 
-            current_price = Decimal(data["price"])
-        except:
-            return Response({"error": "Unable to fetch live price"}, status=500)
+        # Realized PnL is stored accurately...
+        pnl = calculate_pnl(pos.entry_price, current_price, pos.side, pos.amount)
 
-    # Calculate final realized PnL
-    pnl = calculate_pnl(pos.entry_price, current_price, pos.side, pos.amount)
+        # ...but the wallet credit is floored at 0: a blown-up position can
+        # lose at most its margin (it would have been liquidated), so we never
+        # drive the wallet balance negative.
+        credited = max(Decimal("0"), pos.initial_margin + pnl)
 
-    # Close the position
-    pos.status = "CLOSED"
-    pos.closed_at = timezone.now()
-    pos.pnl = pnl
-    pos.save()
+        pos.status = "CLOSED"
+        pos.closed_at = timezone.now()
+        pos.pnl = pnl
+        pos.save()
 
-    # Return money + PnL to wallet
-    wallet = FuturesWallet.objects.get(user=user)
-    wallet.balance += pos.initial_margin + pnl
-    wallet.save()
+        wallet.balance += credited
+        wallet.save()
 
     return Response({
         "message": "Position closed successfully",

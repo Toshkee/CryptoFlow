@@ -2,10 +2,12 @@ asgiref==3.11.0
 certifi==2025.11.12
 charset-normalizer==3.4.4
 cloudinary==1.44.1
+dj-database-url==3.1.2
 Django==5.2.8
 django-cors-headers==4.9.0
 djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
+drf-spectacular==0.29.0
 idna==3.11
 psycopg2-binary==2.9.11
 PyJWT==2.10.1
@@ -16,3 +18,8 @@ sqlparse==0.5.4
 urllib3==2.5.0
 whitenoise==6.7.0
 gunicorn==23.0.0
+
+# --- Testing (dev/CI) ---
+pytest==9.1.1
+pytest-django==4.12.0
+factory_boy==3.3.3

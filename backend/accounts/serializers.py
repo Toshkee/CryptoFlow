@@ -1,6 +1,10 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.password_validation import (
+    validate_password as django_validate_password,
+)
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 from .models import Profile
 from futures.models import FuturesWallet   # ⭐ ADD THIS
@@ -8,7 +12,7 @@ from futures.models import FuturesWallet   # ⭐ ADD THIS
 
 class SignupSerializer(serializers.ModelSerializer):
     """ Handles user registration + auto profile + auto futures wallet """
-    
+
     class Meta:
         model = User
         fields = ["username", "email", "password"]
@@ -16,6 +20,21 @@ class SignupSerializer(serializers.ModelSerializer):
             "password": {"write_only": True},
             "email": {"required": True},
         }
+
+    def validate_password(self, value):
+        # Run Django's configured AUTH_PASSWORD_VALIDATORS (length, common
+        # passwords, numeric-only, similarity to username/email). Signup
+        # previously bypassed these entirely. A throwaway unsaved User gives
+        # the similarity validator something to compare against.
+        user = User(
+            username=self.initial_data.get("username", ""),
+            email=self.initial_data.get("email", ""),
+        )
+        try:
+            django_validate_password(value, user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages))
+        return value
 
     def validate(self, data):
         # username exists?
