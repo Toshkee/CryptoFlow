@@ -15,9 +15,22 @@ Live Binance order books, a streaming trades tape and candlesticks · leverage u
 ![DRF](https://img.shields.io/badge/DRF-A30000?logo=django&logoColor=white)
 ![Postgres](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
 
-</div>
+<br/>
 
-> _Replace this line with a hero GIF of the Trade terminal — a leveraged position opening and the PnL flashing live._
+![CryptoFlow — live Trade terminal](docs/media/trade-demo.gif)
+
+<table>
+  <tr>
+    <td width="50%" align="center"><img src="docs/media/trade.png" alt="Trade terminal" /><br/><sub><b>Trade</b> — live chart · order book · trades tape</sub></td>
+    <td width="50%" align="center"><img src="docs/media/markets.png" alt="Markets" /><br/><sub><b>Markets</b> — top 100 · logos · 7d sparklines</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="docs/media/wallet.png" alt="Wallet & portfolio" /><br/><sub><b>Wallet</b> — live-valued portfolio · allocation · transfers</sub></td>
+    <td width="50%" align="center"><img src="docs/media/home.png" alt="Landing page" /><br/><sub><b>Home</b> — live ticker landing page</sub></td>
+  </tr>
+</table>
+
+</div>
 
 ---
 
