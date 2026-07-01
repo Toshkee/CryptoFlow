@@ -42,7 +42,7 @@ export function Navbar() {
     <header className="sticky top-0 z-40 border-b border-border bg-bg/80 backdrop-blur-xl">
       <div className="mx-auto flex h-15 max-w-[1600px] items-center gap-6 px-4 py-3 sm:px-6">
         <Link to="/" className="shrink-0" aria-label="CryptoFlow home">
-          <Logo />
+          <Logo className="h-10 sm:h-11" />
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">

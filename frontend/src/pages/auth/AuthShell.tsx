@@ -22,7 +22,7 @@ export function AuthShell({
       <div className="relative w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
           <Link to="/">
-            <Logo />
+            <Logo className="h-14" />
           </Link>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
