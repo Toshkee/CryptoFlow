@@ -1,0 +1,27 @@
+name: Keep backend warm
+
+# Render's free web tier spins the instance down after ~15 min of inactivity,
+# so the next visitor eats a 50-90s cold start. This pings the health endpoint
+# on a schedule to keep it awake, so the live demo is responsive for recruiters.
+#
+# Notes:
+#  - GitHub's scheduled runs can be delayed under load, so we ping every 10 min
+#    to stay comfortably under the 15-min spin-down window.
+#  - GitHub disables schedules after 60 days of no repo activity — just push
+#    anything (or hit "Run workflow") to re-enable.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # every 10 minutes
+  workflow_dispatch:          # allow manual runs from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        # --max-time 120 lets the very first ping wait out a cold start instead
+        # of giving up; `|| true` keeps a slow wake from failing the workflow.
+        run: |
+          curl -fsS --max-time 120 --retry 2 --retry-all-errors \
+            https://cryptoflow-api-cx07.onrender.com/api/health/ || true
