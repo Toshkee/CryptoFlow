@@ -15,7 +15,7 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.urls import path, include
 
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
@@ -29,7 +29,55 @@ def health(request):
     return JsonResponse({"status": "ok"})
 
 
+API_ROOT_HTML = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CryptoFlow API</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center;
+    background: #0a0b0d; color: #e6e8eb;
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { padding: 48px 24px; max-width: 34rem; }
+  h1 { font: 400 2.5rem/1.1 Georgia, "Times New Roman", serif; letter-spacing: -0.01em; margin: 0; }
+  h1 em { font-style: normal; color: #7c5cff; }
+  p { color: #8b919a; margin: 12px 0 28px; }
+  ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid #24272e; }
+  li { border-bottom: 1px solid #24272e; }
+  a { display: flex; justify-content: space-between; gap: 24px; padding: 14px 4px;
+      color: #e6e8eb; text-decoration: none; }
+  a:hover { color: #fff; background: #111317; }
+  a code { font: 0.875rem ui-monospace, "SF Mono", monospace; color: #8b919a; }
+  footer { margin-top: 28px; font-size: 0.8rem; color: #5b616b; }
+</style>
+</head>
+<body>
+<main>
+  <h1>CryptoFlow <em>API</em></h1>
+  <p>The backend for the CryptoFlow paper-trading terminal. The app itself lives on the frontend &mdash; this host only serves the API.</p>
+  <ul>
+    <li><a href="/api/docs/">Interactive docs <code>/api/docs/</code></a></li>
+    <li><a href="/api/schema/">OpenAPI schema <code>/api/schema/</code></a></li>
+    <li><a href="/api/health/">Health check <code>/api/health/</code></a></li>
+    <li><a href="/admin/">Admin <code>/admin/</code></a></li>
+  </ul>
+  <footer>Paper money only. Nothing here is financial advice.</footer>
+</main>
+</body>
+</html>"""
+
+
+def api_root(request):
+    """Friendly landing page for the bare API host (instead of a 404)."""
+    return HttpResponse(API_ROOT_HTML)
+
+
 urlpatterns = [
+    path("", api_root),
     path("admin/", admin.site.urls),
 
     path("api/health/", health),

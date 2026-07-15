@@ -69,7 +69,7 @@ export default function Profile() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
-      <h1 className="mb-6 text-3xl font-bold tracking-tight">Profile</h1>
+      <h1 className="mb-6 font-display text-3xl tracking-tight sm:text-4xl">Profile</h1>
 
       <div className="space-y-6">
         {/* avatar */}

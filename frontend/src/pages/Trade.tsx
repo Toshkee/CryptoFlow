@@ -115,7 +115,7 @@ export default function Trade() {
       <div className="sticky top-15 z-30 border-b border-border bg-bg/90 backdrop-blur-xl">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5">
           <Select value={symbol} onValueChange={setSymbol}>
-            <SelectTrigger className="h-9 w-36 bg-surface-2 font-semibold">
+            <SelectTrigger className="h-9 w-auto min-w-36 whitespace-nowrap bg-surface-2 font-semibold">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

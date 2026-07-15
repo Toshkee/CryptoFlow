@@ -80,7 +80,7 @@ export default function Markets() {
   return (
     <div className="mx-auto max-w-[1600px] px-4 py-8 sm:px-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">Markets</h1>
+        <h1 className="font-display text-3xl tracking-tight sm:text-4xl">Markets</h1>
         <p className="mt-1 text-muted">Live prices for the top 100 crypto assets by market cap.</p>
       </div>
 

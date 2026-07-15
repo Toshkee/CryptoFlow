@@ -112,7 +112,7 @@ export function Navbar() {
             ))}
             {!user && (
               <div className="mt-2 flex gap-2">
-                <Button variant="outline" className="flex-1" asChild onClick={() => setOpen(false)}>
+                <Button variant="ghost" className="flex-1" asChild onClick={() => setOpen(false)}>
                   <Link to="/signin">Sign in</Link>
                 </Button>
                 <Button className="flex-1" asChild onClick={() => setOpen(false)}>

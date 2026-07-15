@@ -13,8 +13,8 @@ export function Footer() {
   const year = new Date().getFullYear()
   return (
     <footer className="mt-auto border-t border-border bg-surface-1">
-      <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-4 py-8 sm:px-6 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-2">
+      <div className="mx-auto grid max-w-[1600px] gap-8 px-4 py-10 sm:px-6 md:grid-cols-2">
+        <div className="space-y-3">
           <Logo />
           <p className="max-w-md text-xs leading-relaxed text-faint">
             CryptoFlow is a paper-trading simulator for educational purposes. No real funds are involved and nothing
@@ -22,7 +22,7 @@ export function Footer() {
           </p>
         </div>
 
-        <div className="flex items-center gap-6 text-sm text-muted">
+        <div className="flex items-start gap-6 text-sm text-muted md:pt-1">
           <Link to="/markets" className="transition-colors hover:text-text">
             Markets
           </Link>
@@ -39,7 +39,9 @@ export function Footer() {
           </a>
         </div>
       </div>
-      <div className="border-t border-border py-3 text-center text-xs text-faint">© {year} CryptoFlow</div>
+      <div className="border-t border-border">
+        <div className="mx-auto max-w-[1600px] px-4 py-3 text-xs text-faint sm:px-6">© {year} CryptoFlow</div>
+      </div>
     </footer>
   )
 }

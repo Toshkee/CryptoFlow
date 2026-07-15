@@ -19,10 +19,7 @@ export function Logo({ className }: { className?: string }) {
       src={logoUrl}
       alt="CryptoFlow"
       draggable={false}
-      className={cn(
-        'h-10 w-auto select-none object-contain drop-shadow-[0_2px_10px_rgba(111,69,245,0.35)]',
-        className,
-      )}
+      className={cn('h-10 w-auto select-none object-contain', className)}
     />
   )
 }

@@ -13,12 +13,7 @@ export function LiveDot({ status, label, className }: { status: ConnStatus; labe
   const m = MAP[status]
   return (
     <span className={cn('inline-flex items-center gap-1.5 text-xs font-medium text-muted', className)}>
-      <span className="relative flex size-2">
-        {status === 'live' && (
-          <span className={cn('absolute inline-flex h-full w-full animate-ping rounded-full opacity-60', m.color)} />
-        )}
-        <span className={cn('relative inline-flex size-2 rounded-full', m.color)} />
-      </span>
+      <span className={cn('inline-flex size-2 rounded-full', m.color, status === 'live' && 'animate-pulse-dot')} />
       {label ?? m.label}
     </span>
   )
