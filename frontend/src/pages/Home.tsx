@@ -70,7 +70,7 @@ export default function Home() {
         </div>
 
         {/* the live board — real, populated, bleeding into the section below */}
-        <div className="relative mt-14 -mb-16 lg:mt-16 lg:-mb-24">
+        <div className="relative z-10 mt-14 -mb-16 lg:mt-16 lg:-mb-24">
           <Bracket className="-left-2 -top-2 border-l-2 border-t-2" />
           <Bracket className="-right-2 -top-2 border-r-2 border-t-2" />
           <Bracket className="-bottom-2 -left-2 border-b-2 border-l-2" />
