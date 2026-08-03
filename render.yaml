@@ -4,11 +4,10 @@
 # The frontend (frontend/) deploys separately as a static site (Netlify/Render
 # Static) with VITE_API_BASE pointing at this service's URL.
 
-databases:
-  - name: cryptoflow-db
-    plan: free
-    databaseName: cryptoflow
-    postgresMajorVersion: "16"
+# NOTE: no `databases:` block on purpose. Render's free Postgres is deleted
+# ~30 days after creation, which silently killed the live demo once already.
+# The database is an external, non-expiring free Postgres (Neon) instead —
+# set DATABASE_URL manually in the Render dashboard (see below).
 
 services:
   - type: web
@@ -26,10 +25,10 @@ services:
         value: "False"
       - key: SECRET_KEY
         generateValue: true
+      # Neon Postgres connection string — set by hand in the Render dashboard
+      # (sync: false keeps it out of the repo). Must include ?sslmode=require.
       - key: DATABASE_URL
-        fromDatabase:
-          name: cryptoflow-db
-          property: connectionString
+        sync: false
       - key: DEPLOYED_FRONTEND_URL
         value: https://cryptofloww.netlify.app # the live Netlify frontend (CORS origin)
       - key: COINGECKO_API_KEY

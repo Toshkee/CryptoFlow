@@ -25,3 +25,11 @@ jobs:
         run: |
           curl -fsS --max-time 120 --retry 2 --retry-all-errors \
             https://cryptoflow-api-cx07.onrender.com/api/health/ || true
+
+      - name: Check the database is reachable
+        # /api/health/ only proves the web process is alive — it says "ok" even
+        # when the database is gone and every real endpoint 500s. This step has
+        # no `|| true`, so a dead database turns the run red and GitHub emails.
+        run: |
+          curl -fsS --max-time 120 --retry 2 --retry-all-errors \
+            https://cryptoflow-api-cx07.onrender.com/api/health/db/
