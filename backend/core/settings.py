@@ -168,15 +168,22 @@ WSGI_APPLICATION = "core.wsgi.application"
 # -------------------------------------------------------------------
 # DATABASE
 # -------------------------------------------------------------------
-# Production (Heroku/etc.) sets DATABASE_URL -> parsed by dj-database-url with
-# persistent connections and SSL required (when not DEBUG). Local dev with no
+# Production sets DATABASE_URL -> parsed by dj-database-url with persistent
+# connections and SSL required (when not DEBUG). Local dev with no
 # DATABASE_URL falls back to SQLite so the app stays runnable with zero setup.
+#
+# conn_health_checks matters because the database is a serverless Postgres
+# (Neon) that suspends its compute after a few minutes of inactivity, closing
+# every open connection. Without a health check, conn_max_age hands a reused
+# but already-dead connection to the next request and it 500s; with it, Django
+# pings first and transparently reconnects.
 DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL:
     DATABASES = {
         "default": dj_database_url.parse(
             DATABASE_URL,
             conn_max_age=600,
+            conn_health_checks=True,
             ssl_require=not DEBUG,
         )
     }
