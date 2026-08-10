@@ -29,7 +29,14 @@ REQUEST_TIMEOUT = 5
 
 # Binance spot ticker — used as the mark price (spot index) for futures
 # settlement. See the module docstring for why spot rather than fapi.
-BINANCE_MARK_TICKER = "https://api.binance.com/api/v3/ticker/price"
+# api.binance.com returns HTTP 451 from US datacenter IPs (Render's default
+# Oregon region included), so data-api.binance.vision — Binance's public
+# market-data mirror serving the same endpoint without the geo-block — is
+# tried as a fallback. Same exchange, same price, no drift.
+BINANCE_MARK_TICKERS = (
+    "https://api.binance.com/api/v3/ticker/price",
+    "https://data-api.binance.vision/api/v3/ticker/price",
+)
 
 FUTURES_PRICE_CACHE_SECONDS = 3
 SPOT_PRICE_CACHE_SECONDS = 10
@@ -58,19 +65,25 @@ def get_futures_price(symbol):
     if cached is not None:
         return cached
 
-    try:
-        resp = requests.get(
-            BINANCE_MARK_TICKER,
-            params={"symbol": symbol},
-            timeout=REQUEST_TIMEOUT,
-        )
-        resp.raise_for_status()
-        price = Decimal(str(resp.json()["price"]))
-    except (requests.RequestException, KeyError, ValueError, TypeError,
-            InvalidOperation) as exc:
+    price = None
+    last_exc = None
+    for ticker_url in BINANCE_MARK_TICKERS:
+        try:
+            resp = requests.get(
+                ticker_url,
+                params={"symbol": symbol},
+                timeout=REQUEST_TIMEOUT,
+            )
+            resp.raise_for_status()
+            price = Decimal(str(resp.json()["price"]))
+            break
+        except (requests.RequestException, KeyError, ValueError, TypeError,
+                InvalidOperation) as exc:
+            last_exc = exc
+    if price is None:
         raise PriceUnavailable(
             f"Could not fetch futures price for {symbol}"
-        ) from exc
+        ) from last_exc
 
     if price <= 0:
         raise PriceUnavailable(f"Invalid futures price for {symbol}")
