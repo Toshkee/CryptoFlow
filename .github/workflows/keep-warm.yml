@@ -28,8 +28,25 @@ jobs:
 
       - name: Check the database is reachable
         # /api/health/ only proves the web process is alive — it says "ok" even
-        # when the database is gone and every real endpoint 500s. This step has
-        # no `|| true`, so a dead database turns the run red and GitHub emails.
+        # when the database is gone and every real endpoint 500s. This step can
+        # fail the run, so a dead database turns it red and GitHub emails.
+        #
+        # It retries 6 times, 20s apart, before giving up. curl's own --retry
+        # backs off in seconds, which is too tight for Render: a redeploy or an
+        # edge blip resets the connection (curl exit 56) for 10-30s and used to
+        # page us for a database that was perfectly healthy. A genuinely dead
+        # database fails every attempt, so real outages still go red.
+        env:
+          URL: https://cryptoflow-api-cx07.onrender.com/api/health/db/
         run: |
-          curl -fsS --max-time 120 --retry 2 --retry-all-errors \
-            https://cryptoflow-api-cx07.onrender.com/api/health/db/
+          for attempt in $(seq 1 6); do
+            body=$(curl -fsS --max-time 60 "$URL") && rc=0 || rc=$?
+            if [ "$rc" -eq 0 ]; then
+              echo "attempt $attempt: ok — $body"
+              exit 0
+            fi
+            echo "attempt $attempt: failed (curl exit $rc)"
+            if [ "$attempt" -lt 6 ]; then sleep 20; fi
+          done
+          echo "::error::/api/health/db/ unreachable after 6 attempts — the database is down"
+          exit 1
